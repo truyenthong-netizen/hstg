@@ -1,0 +1,19 @@
+{
+  "name": "qlgv-thinhgiang",
+  "version": "0.1.0",
+  "private": true,
+  "description": "He thong Quan ly Giang vien Thinh giang va Hop dong theo nam hoc - Apps Script + Google Sheets + Cloudflare",
+  "scripts": {
+    "clasp:login": "clasp login",
+    "clasp:push": "cd apps-script && clasp push",
+    "clasp:open": "cd apps-script && clasp open",
+    "clasp:deploy": "cd apps-script && clasp deploy",
+    "worker:dev": "cd cloudflare-worker && wrangler dev",
+    "worker:deploy": "cd cloudflare-worker && wrangler deploy",
+    "pages:deploy": "wrangler pages deploy frontend --project-name=qlgv-thinhgiang"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "wrangler": "^3.0.0"
+  }
+}

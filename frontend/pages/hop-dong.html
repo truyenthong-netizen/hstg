@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hợp đồng thỉnh giảng — Admin</title>
+<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>QL Giảng viên thỉnh giảng</strong>
+    <nav>
+      <a href="tra-cuu-giang-vien.html">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html">Danh sách đơn vị</a>
+      <a href="hop-dong.html">Hợp đồng</a>
+      <a href="thanh-ly.html">Thanh lý</a>
+      <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Bước 5 — Lập hợp đồng mới (Admin)</h2>
+      <label>Tra cứu giảng viên theo CCCD *</label>
+      <input id="cccd" />
+      <button onclick="traCuuGiangVien()">Tra cứu</button>
+      <div id="thongTinGV" style="margin-top:8px; font-size:14px;"></div>
+
+      <label>Đơn vị *</label>
+      <select id="donViChon"></select>
+      <label>Năm học *</label>
+      <select id="namHocChon"></select>
+      <label>Nội dung giảng dạy (mô tả chung)</label>
+      <input id="noiDungGiangDay" />
+      <label>Từ ngày</label><input id="tuNgay" type="date" />
+      <label>Đến ngày</label><input id="denNgay" type="date" />
+
+      <h3>Số giờ dự kiến theo loại nội dung</h3>
+      <table>
+        <thead><tr><th>Loại nội dung</th><th>Đại học</th><th>Sau đại học</th></tr></thead>
+        <tbody id="bangGioDuKien"></tbody>
+      </table>
+
+      <button onclick="taoHopDong()">Lập hợp đồng + sinh Quyết định</button>
+      <div id="loi" class="error"></div>
+      <div id="thanhCong" style="color:#1a7a35; margin-top:8px;"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/api.js"></script>
+  <script>
+    requireLogin();
+    let giangVienChon = null;
+    let danhMucNoiDung = [];
+
+    async function khoiTao() {
+      const [donVis, namHocs, noiDungs] = await Promise.all([
+        callApi('danhSachDonVi', {}),
+        callApi('danhSachNamHoc', {}),
+        callApi('danhMucNoiDungGiangDay', {}),
+      ]);
+      document.getElementById('donViChon').innerHTML = donVis.map(d => `<option value="${d.ID_DonVi}">${d.Ten_DonVi}</option>`).join('');
+      document.getElementById('namHocChon').innerHTML = namHocs.map(n => `<option value="${n.ID_NamHoc}">${n.Ten_NamHoc}</option>`).join('');
+      danhMucNoiDung = noiDungs;
+      document.getElementById('bangGioDuKien').innerHTML = noiDungs.map(nd => `
+        <tr>
+          <td>${nd.Ten_NoiDung}</td>
+          <td><input type="number" min="0" id="dh_${nd.ID_NoiDung}" style="width:80px;" /></td>
+          <td><input type="number" min="0" id="sdh_${nd.ID_NoiDung}" style="width:80px;" /></td>
+        </tr>`).join('');
+    }
+    khoiTao();
+
+    async function traCuuGiangVien() {
+      const cccd = document.getElementById('cccd').value.trim();
+      try {
+        const gv = await callApi('traCuuGiangVienTheoCCCD', { soCCCD: cccd });
+        if (!gv) {
+          document.getElementById('thongTinGV').innerHTML = '<span style="color:#b00020;">Chưa có hồ sơ — tạo hồ sơ ở trang Tra cứu / Lập danh sách trước.</span>';
+          giangVienChon = null;
+          return;
+        }
+        giangVienChon = gv;
+        document.getElementById('thongTinGV').innerHTML = `Đã chọn: <strong>${gv.Ho_Ten}</strong> (${gv.Hoc_Ham_Hoc_Vi})`;
+      } catch (err) {
+        document.getElementById('loi').textContent = err.message;
+      }
+    }
+
+    async function taoHopDong() {
+      const loiEl = document.getElementById('loi');
+      loiEl.textContent = '';
+      if (!giangVienChon) { loiEl.textContent = 'Chưa chọn giảng viên hợp lệ'; return; }
+
+      const chiTietGioDuKien = [];
+      danhMucNoiDung.forEach(nd => {
+        const dh = Number(document.getElementById('dh_' + nd.ID_NoiDung).value || 0);
+        const sdh = Number(document.getElementById('sdh_' + nd.ID_NoiDung).value || 0);
+        if (dh > 0) chiTietGioDuKien.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'DaiHoc', So_Gio: dh });
+        if (sdh > 0) chiTietGioDuKien.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'SauDaiHoc', So_Gio: sdh });
+      });
+
+      const hopDong = {
+        ID_GiangVien: giangVienChon.ID_GiangVien,
+        ID_DonVi: document.getElementById('donViChon').value,
+        ID_NamHoc: document.getElementById('namHocChon').value,
+        Noi_Dung_Giang_Day: document.getElementById('noiDungGiangDay').value,
+        Tu_Ngay: document.getElementById('tuNgay').value,
+        Den_Ngay: document.getElementById('denNgay').value,
+        chiTietGioDuKien: chiTietGioDuKien,
+      };
+
+      try {
+        const result = await callApi('taoHopDong', { hopDong });
+        document.getElementById('thanhCong').textContent =
+          `Đã tạo hợp đồng ${result.hopDong.Ma_So_HopDong} kèm Quyết định ${result.quyetDinh.Ma_So_QuyetDinh} (trạng thái: Dự thảo).`;
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+  </script>
+</body>
+</html>

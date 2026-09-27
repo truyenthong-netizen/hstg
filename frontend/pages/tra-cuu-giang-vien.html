@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tra cứu giảng viên thỉnh giảng</title>
+<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>QL Giảng viên thỉnh giảng</strong>
+    <nav>
+      <a href="tra-cuu-giang-vien.html">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html">Danh sách đơn vị</a>
+      <a href="hop-dong.html">Hợp đồng</a>
+      <a href="thanh-ly.html">Thanh lý</a>
+      <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Bước 0 — Năm học đang chọn</h2>
+      <select id="namHocChon"></select>
+    </div>
+
+    <div class="card">
+      <h2>Bước 1 — Tra cứu giảng viên theo CCCD</h2>
+      <label>Số CCCD</label>
+      <input id="cccd" type="text" maxlength="12" />
+      <button onclick="traCuu()">Tra cứu</button>
+      <div id="loiTraCuu" class="error"></div>
+    </div>
+
+    <div class="card" id="ketQuaCoSan" style="display:none;">
+      <h2>Bước 2a — Đã tìm thấy hồ sơ</h2>
+      <table>
+        <tr><td>Họ tên</td><td id="ktHoTen"></td></tr>
+        <tr><td>Học hàm/học vị</td><td id="ktHocHam"></td></tr>
+        <tr><td>CCCD</td><td id="ktCccd"></td></tr>
+      </table>
+      <button onclick="hienThemDanhSach()">Chọn hồ sơ này → thêm vào danh sách đơn vị</button>
+    </div>
+
+    <div class="card" id="formTaoMoi" style="display:none;">
+      <h2>Bước 2b — Chưa có hồ sơ, tạo mới</h2>
+      <label>Họ tên *</label><input id="tmHoTen" />
+      <label>Ngày sinh</label><input id="tmNgaySinh" type="date" />
+      <label>Giới tính</label>
+      <select id="tmGioiTinh"><option>Nam</option><option>Nữ</option></select>
+      <label>Học hàm/học vị</label>
+      <select id="tmHocHam">
+        <option>GS.TS</option><option>PGS.TS</option><option>TS</option><option>ThS</option><option>Đại học</option>
+      </select>
+      <label>Chuyên ngành</label><input id="tmChuyenNganh" />
+      <label>Đơn vị công tác chính</label><input id="tmDonViCongTac" />
+      <label>Địa chỉ</label><input id="tmDiaChi" />
+      <label>Số điện thoại</label><input id="tmDienThoai" />
+      <label>Email</label><input id="tmEmail" />
+      <label>Số tài khoản</label><input id="tmSoTaiKhoan" />
+      <label>Ngân hàng</label><input id="tmNganHang" />
+      <label>Chi nhánh</label><input id="tmChiNhanh" />
+      <label>Mã số thuế</label><input id="tmMaSoThue" />
+      <button onclick="taoMoi()">Lưu hồ sơ mới</button>
+      <div id="loiTaoMoi" class="error"></div>
+    </div>
+
+    <div class="card" id="formDanhSach" style="display:none;">
+      <h2>Bước 3 — Bổ sung thông tin nghiệp vụ &amp; lập danh sách</h2>
+      <label>Môn học/học phần *</label><input id="dsMonHoc" />
+      <label>Học kỳ</label><input id="dsHocKy" />
+      <label>Loại hình hoạt động</label><input id="dsLoaiHinh" />
+      <label>Số tiết/số giờ dự kiến</label><input id="dsSoTiet" type="number" />
+      <label>Thời gian thực hiện</label><input id="dsThoiGian" placeholder="VD: 09/2026 - 01/2027" />
+      <button onclick="luuVaoDanhSach()">Lưu vào danh sách đơn vị</button>
+      <div id="loiDanhSach" class="error"></div>
+      <div id="thanhCongDanhSach" style="color:#1a7a35; margin-top:8px;"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/api.js"></script>
+  <script>
+    requireLogin();
+    let giangVienHienTai = null;
+
+    async function napNamHoc() {
+      const list = await callApi('danhSachNamHoc', {});
+      const sel = document.getElementById('namHocChon');
+      sel.innerHTML = list.map(nh => `<option value="${nh.ID_NamHoc}">${nh.Ten_NamHoc}</option>`).join('');
+    }
+    napNamHoc();
+
+    async function traCuu() {
+      const cccd = document.getElementById('cccd').value.trim();
+      document.getElementById('loiTraCuu').textContent = '';
+      document.getElementById('ketQuaCoSan').style.display = 'none';
+      document.getElementById('formTaoMoi').style.display = 'none';
+      document.getElementById('formDanhSach').style.display = 'none';
+      if (!cccd) { document.getElementById('loiTraCuu').textContent = 'Nhập số CCCD'; return; }
+
+      try {
+        const gv = await callApi('traCuuGiangVienTheoCCCD', { soCCCD: cccd });
+        if (gv) {
+          giangVienHienTai = gv;
+          document.getElementById('ktHoTen').textContent = gv.Ho_Ten;
+          document.getElementById('ktHocHam').textContent = gv.Hoc_Ham_Hoc_Vi;
+          document.getElementById('ktCccd').textContent = gv.So_CCCD;
+          document.getElementById('ketQuaCoSan').style.display = 'block';
+        } else {
+          document.getElementById('formTaoMoi').style.display = 'block';
+        }
+      } catch (err) {
+        document.getElementById('loiTraCuu').textContent = err.message;
+      }
+    }
+
+    async function taoMoi() {
+      const loiEl = document.getElementById('loiTaoMoi');
+      loiEl.textContent = '';
+      const giangVien = {
+        So_CCCD: document.getElementById('cccd').value.trim(),
+        Ho_Ten: document.getElementById('tmHoTen').value.trim(),
+        Ngay_Sinh: document.getElementById('tmNgaySinh').value,
+        Gioi_Tinh: document.getElementById('tmGioiTinh').value,
+        Hoc_Ham_Hoc_Vi: document.getElementById('tmHocHam').value,
+        Chuyen_Nganh: document.getElementById('tmChuyenNganh').value,
+        Don_Vi_Cong_Tac_Chinh: document.getElementById('tmDonViCongTac').value,
+        Dia_Chi: document.getElementById('tmDiaChi').value,
+        So_Dien_Thoai: document.getElementById('tmDienThoai').value,
+        Email: document.getElementById('tmEmail').value,
+        So_Tai_Khoan: document.getElementById('tmSoTaiKhoan').value,
+        Ngan_Hang: document.getElementById('tmNganHang').value,
+        Chi_Nhanh: document.getElementById('tmChiNhanh').value,
+        Ma_So_Thue: document.getElementById('tmMaSoThue').value,
+      };
+      try {
+        giangVienHienTai = await callApi('taoGiangVien', { giangVien });
+        document.getElementById('formTaoMoi').style.display = 'none';
+        hienThemDanhSach();
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+
+    function hienThemDanhSach() {
+      document.getElementById('formDanhSach').style.display = 'block';
+    }
+
+    async function luuVaoDanhSach() {
+      const loiEl = document.getElementById('loiDanhSach');
+      loiEl.textContent = '';
+      const phanCong = {
+        ID_GiangVien: giangVienHienTai.ID_GiangVien,
+        ID_DonVi: localStorage.getItem('idDonVi'),
+        ID_NamHoc: document.getElementById('namHocChon').value,
+        Mon_Hoc_HocPhan: document.getElementById('dsMonHoc').value,
+        Hoc_Ky: document.getElementById('dsHocKy').value,
+        Loai_Hinh_HD: document.getElementById('dsLoaiHinh').value,
+        So_Tiet_So_Gio: document.getElementById('dsSoTiet').value,
+        Thoi_Gian_Thuc_Hien: document.getElementById('dsThoiGian').value,
+      };
+      try {
+        await callApi('themVaoDanhSach', { phanCong });
+        document.getElementById('thanhCongDanhSach').textContent = 'Đã thêm vào danh sách của đơn vị.';
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+  </script>
+</body>
+</html>

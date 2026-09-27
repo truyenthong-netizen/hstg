@@ -1,0 +1,64 @@
+:root {
+  --navy: #1f3864;
+  --bg: #f4f6f9;
+  --border: #d9dee5;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: #1a1a1a;
+}
+header.topbar {
+  background: var(--navy);
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header.topbar nav a {
+  color: #fff;
+  text-decoration: none;
+  margin-right: 16px;
+  font-size: 14px;
+}
+main { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+h1, h2 { color: var(--navy); }
+label { display: block; margin: 10px 0 4px; font-size: 14px; font-weight: 600; }
+input, select, textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+button {
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 12px;
+}
+button.secondary { background: #6c7a89; }
+button:hover { opacity: 0.9; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+th { background: #eef1f5; }
+.error { color: #b00020; font-size: 14px; margin-top: 8px; }
+.badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #fff; }
+.badge.Du_Thao { background: #999; }
+.badge.Da_Ky { background: #1a7a35; }
+.badge.Da_Thanh_Ly { background: #1f3864; }
+.badge.Huy { background: #b00020; }

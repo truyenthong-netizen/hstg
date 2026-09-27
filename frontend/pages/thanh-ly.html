@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thanh lý hợp đồng thỉnh giảng</title>
+<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>QL Giảng viên thỉnh giảng</strong>
+    <nav>
+      <a href="tra-cuu-giang-vien.html">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html">Danh sách đơn vị</a>
+      <a href="hop-dong.html">Hợp đồng</a>
+      <a href="thanh-ly.html">Thanh lý</a>
+      <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Bước 8 — Chọn hợp đồng đủ điều kiện thanh lý</h2>
+      <input id="tuKhoa" placeholder="Tìm theo số hợp đồng hoặc CCCD" oninput="taiDanhSachHopDong()" />
+      <table>
+        <thead><tr><th>Số hợp đồng</th><th>CCCD</th><th></th></tr></thead>
+        <tbody id="thanBangHopDong"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="cardThanhLy" style="display:none;">
+      <h2>Bước 9 — Nhập số giờ thực tế (theo Giấy xác nhận giờ giảng)</h2>
+      <p>Hợp đồng: <strong id="tlMaSoHopDong"></strong></p>
+      <label>Người xác nhận (Trưởng bộ môn)</label><input id="tlNguoiXacNhan" />
+      <label>Chức vụ</label><input id="tlChucVu" />
+      <label>Thời gian (VD: 9/2024 đến 7/2025)</label><input id="tlThoiGian" />
+
+      <table>
+        <thead><tr><th>Loại nội dung</th><th>Đại học</th><th>Sau đại học</th></tr></thead>
+        <tbody id="bangGioThucTe"></tbody>
+      </table>
+
+      <button onclick="thucHienThanhLy()">Bước 10-11 — Kiểm tra &amp; Thanh lý</button>
+      <div id="loiThanhLy" class="error"></div>
+      <div id="ketQuaThanhLy" style="color:#1a7a35; margin-top:8px;"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/api.js"></script>
+  <script>
+    requireLogin();
+    let danhMucNoiDung = [];
+    let hopDongChon = null;
+
+    async function khoiTao() {
+      danhMucNoiDung = await callApi('danhMucNoiDungGiangDay', {});
+      taiDanhSachHopDong();
+    }
+
+    async function taiDanhSachHopDong() {
+      const tuKhoa = document.getElementById('tuKhoa').value.trim();
+      const list = await callApi('layHopDongChoThanhLy', { idDonVi: localStorage.getItem('idDonVi'), tuKhoa });
+      document.getElementById('thanBangHopDong').innerHTML = list.map(hd => `
+        <tr>
+          <td>${hd.Ma_So_HopDong}</td>
+          <td>${hd.So_CCCD}</td>
+          <td><button onclick='chonHopDong(${JSON.stringify(hd)})'>Chọn</button></td>
+        </tr>`).join('');
+    }
+
+    function chonHopDong(hd) {
+      hopDongChon = hd;
+      document.getElementById('tlMaSoHopDong').textContent = hd.Ma_So_HopDong;
+      document.getElementById('bangGioThucTe').innerHTML = danhMucNoiDung.map(nd => `
+        <tr>
+          <td>${nd.Ten_NoiDung}</td>
+          <td><input type="number" min="0" id="dh_${nd.ID_NoiDung}" style="width:80px;" /></td>
+          <td><input type="number" min="0" id="sdh_${nd.ID_NoiDung}" style="width:80px;" /></td>
+        </tr>`).join('');
+      document.getElementById('cardThanhLy').style.display = 'block';
+      document.getElementById('loiThanhLy').textContent = '';
+      document.getElementById('ketQuaThanhLy').textContent = '';
+    }
+
+    async function thucHienThanhLy() {
+      const loiEl = document.getElementById('loiThanhLy');
+      loiEl.textContent = '';
+      const chiTietGioThucTe = [];
+      danhMucNoiDung.forEach(nd => {
+        const dh = Number(document.getElementById('dh_' + nd.ID_NoiDung).value || 0);
+        const sdh = Number(document.getElementById('sdh_' + nd.ID_NoiDung).value || 0);
+        if (dh > 0) chiTietGioThucTe.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'DaiHoc', So_Gio: dh });
+        if (sdh > 0) chiTietGioThucTe.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'SauDaiHoc', So_Gio: sdh });
+      });
+
+      try {
+        // Bước 9: lập Giấy xác nhận giờ giảng làm căn cứ
+        const gcn = await callApi('taoGiayXacNhan', {
+          gcn: {
+            ID_HopDong: hopDongChon.ID_HopDong,
+            Thoi_Gian_Tu_Den: document.getElementById('tlThoiGian').value,
+            Nguoi_Xac_Nhan: document.getElementById('tlNguoiXacNhan').value,
+            Chuc_Vu_Nguoi_Xac_Nhan: document.getElementById('tlChucVu').value,
+            chiTietGioThucTe: chiTietGioThucTe,
+          },
+        });
+
+        // Bước 10-11: kiểm tra ràng buộc + thanh lý (backend tự chặn nếu vượt giờ)
+        const ketQua = await callApi('thanhLyHopDong', { idHopDong: hopDongChon.ID_HopDong, idGCN: gcn.ID_GCN });
+        document.getElementById('ketQuaThanhLy').textContent =
+          `Đã thanh lý. Biên bản ${ketQua.Ma_So_BienBan} — Tổng giờ chuẩn: ${ketQua.Tong_So_Gio_Chuan_ThucTe} — Thành tiền: ${Number(ketQua.Thanh_Tien).toLocaleString('vi-VN')} đ`;
+        document.getElementById('cardThanhLy').style.display = 'none';
+        taiDanhSachHopDong();
+      } catch (err) {
+        loiEl.textContent = err.message; // VD: "Số giờ thực tế không được vượt quá số giờ theo hợp đồng (X giờ)"
+      }
+    }
+
+    khoiTao();
+  </script>
+</body>
+</html>

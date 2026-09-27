@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Đăng nhập — Hệ thống Quản lý Giảng viên Thỉnh giảng</title>
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <main style="max-width:420px; margin-top:80px;">
+    <div class="card">
+      <h1 style="text-align:center;">Đăng nhập</h1>
+      <label>Tên đăng nhập</label>
+      <input id="tenDangNhap" type="text" autocomplete="username" />
+      <label>Mật khẩu</label>
+      <input id="matKhau" type="password" autocomplete="current-password" />
+      <button onclick="dangNhap()">Đăng nhập</button>
+      <div id="loi" class="error"></div>
+    </div>
+  </main>
+
+  <script src="assets/js/api.js"></script>
+  <script>
+    async function dangNhap() {
+      const tenDangNhap = document.getElementById('tenDangNhap').value.trim();
+      const matKhau = document.getElementById('matKhau').value;
+      const loiEl = document.getElementById('loi');
+      loiEl.textContent = '';
+      try {
+        const data = await callApi('dangNhap', { tenDangNhap, matKhau });
+        setSession(data);
+        window.location.href = data.vaiTro === 'Admin' ? 'pages/hop-dong.html' : 'pages/tra-cuu-giang-vien.html';
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+  </script>
+</body>
+</html>

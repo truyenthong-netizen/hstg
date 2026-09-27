@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Danh sách giảng viên thỉnh giảng của đơn vị</title>
+<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>QL Giảng viên thỉnh giảng</strong>
+    <nav>
+      <a href="tra-cuu-giang-vien.html">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html">Danh sách đơn vị</a>
+      <a href="hop-dong.html">Hợp đồng</a>
+      <a href="thanh-ly.html">Thanh lý</a>
+      <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Bước 4 — Danh sách giảng viên thỉnh giảng của đơn vị</h2>
+      <label>Năm học</label>
+      <select id="namHocChon" onchange="taiDanhSach()"></select>
+      <button class="secondary" onclick="xuatExcel()">Xuất Excel</button>
+      <table id="bangDanhSach">
+        <thead>
+          <tr><th>Họ tên</th><th>CCCD</th><th>Học hàm/học vị</th><th>Môn học/học phần</th><th>Học kỳ</th><th>Số tiết/giờ</th><th>Trạng thái</th></tr>
+        </thead>
+        <tbody id="thanDanhSach"></tbody>
+      </table>
+      <div id="loi" class="error"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/api.js"></script>
+  <script>
+    requireLogin();
+
+    async function napNamHoc() {
+      const list = await callApi('danhSachNamHoc', {});
+      const sel = document.getElementById('namHocChon');
+      sel.innerHTML = list.map(nh => `<option value="${nh.ID_NamHoc}">${nh.Ten_NamHoc}</option>`).join('');
+      taiDanhSach();
+    }
+
+    async function taiDanhSach() {
+      const idNamHoc = document.getElementById('namHocChon').value;
+      try {
+        const ds = await callApi('layDanhSachDonVi', { idDonVi: localStorage.getItem('idDonVi'), idNamHoc });
+        document.getElementById('thanDanhSach').innerHTML = ds.map(r => `
+          <tr>
+            <td>${r.Ho_Ten_GiangVien || ''}</td>
+            <td>${r.So_CCCD || ''}</td>
+            <td>${r.Hoc_Ham_Hoc_Vi || ''}</td>
+            <td>${r.Mon_Hoc_HocPhan || ''}</td>
+            <td>${r.Hoc_Ky || ''}</td>
+            <td>${r.So_Tiet_So_Gio || ''}</td>
+            <td>${r.Trang_Thai || ''}</td>
+          </tr>`).join('');
+      } catch (err) {
+        document.getElementById('loi').textContent = err.message;
+      }
+    }
+
+    async function xuatExcel() {
+      try {
+        const idNamHoc = document.getElementById('namHocChon').value;
+        const result = await callApi('xuatDanhSachExcel', { idDonVi: localStorage.getItem('idDonVi'), idNamHoc });
+        window.open(result.url, '_blank');
+      } catch (err) {
+        document.getElementById('loi').textContent = err.message;
+      }
+    }
+
+    napNamHoc();
+  </script>
+</body>
+</html>
