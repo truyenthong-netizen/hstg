@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quản lý danh mục — Admin</title>
+<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>QL Giảng viên thỉnh giảng</strong>
+    <nav>
+      <a href="tra-cuu-giang-vien.html" data-role="DonVi">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html" data-role="DonVi">Danh sách đơn vị</a>
+      <a href="thanh-ly.html" data-role="DonVi">Thanh lý</a>
+      <a href="hop-dong.html" data-role="Admin">Hợp đồng</a>
+      <a href="danh-muc.html" data-role="Admin">Danh mục</a>
+      <a href="nguoi-dung.html" data-role="Admin">Người dùng</a>
+      <span id="hoTenHienTai" style="margin-right:12px; font-size:13px; opacity:0.85;"></span>
+      <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Đơn vị</h2>
+      <table>
+        <thead><tr><th>Tên đơn vị</th><th>Mã đơn vị</th><th>Người phụ trách</th></tr></thead>
+        <tbody id="bangDonVi"></tbody>
+      </table>
+      <h3>Thêm đơn vị mới</h3>
+      <label>Tên đơn vị *</label><input id="dvTen" />
+      <label>Mã đơn vị *</label><input id="dvMa" placeholder="VD: KHOA_YHCT" />
+      <label>Người phụ trách (tên đăng nhập sẽ gán sau)</label><input id="dvNguoiPhuTrach" />
+      <button onclick="taoDonVi()">Thêm đơn vị</button>
+      <div id="loiDonVi" class="error"></div>
+    </div>
+
+    <div class="card">
+      <h2>Năm học</h2>
+      <table>
+        <thead><tr><th>Tên năm học</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead>
+        <tbody id="bangNamHoc"></tbody>
+      </table>
+      <h3>Thêm năm học mới</h3>
+      <label>Tên năm học * (VD: 2026-2027)</label><input id="nhTen" />
+      <label>Ngày bắt đầu * (01/7)</label><input id="nhBatDau" type="date" />
+      <label>Ngày kết thúc * (30/6 năm sau)</label><input id="nhKetThuc" type="date" />
+      <button onclick="taoNamHoc()">Thêm năm học</button>
+      <div id="loiNamHoc" class="error"></div>
+    </div>
+
+    <div class="card">
+      <h2>Định mức chi thỉnh giảng theo học hàm/học vị</h2>
+      <p style="font-size:13px; color:#555;">Theo Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV). Khi thay định mức, thêm dòng mới với ngày hiệu lực mới — không sửa dòng cũ, để giữ đúng lịch sử tính thù lao các hợp đồng trước đó.</p>
+      <table>
+        <thead><tr><th>Học hàm/học vị</th><th>Đơn giá (đ/tiết chuẩn)</th><th>Hiệu lực từ</th><th>Hiệu lực đến</th><th>Căn cứ</th></tr></thead>
+        <tbody id="bangDinhMuc"></tbody>
+      </table>
+      <h3>Thêm định mức mới</h3>
+      <label>Học hàm/học vị *</label>
+      <select id="dmHocHam">
+        <option>GS.TS</option><option>PGS.TS</option><option>TS</option><option>ThS</option><option>Đại học</option>
+      </select>
+      <label>Đơn giá (đồng/tiết chuẩn) *</label><input id="dmDonGia" type="number" />
+      <label>Hiệu lực từ</label><input id="dmTuNgay" type="date" />
+      <label>Hiệu lực đến (để trống nếu chưa xác định)</label><input id="dmDenNgay" type="date" />
+      <label>Căn cứ (VD: Quy chế chi tiêu nội bộ năm 2026)</label><input id="dmCanCu" />
+      <button onclick="taoDinhMuc()">Thêm định mức</button>
+      <div id="loiDinhMuc" class="error"></div>
+    </div>
+  </main>
+
+  <script src="../assets/js/api.js"></script>
+  <script>
+    requireRole('Admin');
+    initNav();
+
+    async function taiTatCa() {
+      const [donVis, namHocs, dinhMucs] = await Promise.all([
+        callApi('danhSachDonVi', {}),
+        callApi('danhSachNamHoc', {}),
+        callApi('danhSachDinhMuc', {}),
+      ]);
+      document.getElementById('bangDonVi').innerHTML = donVis.map(d => `
+        <tr><td>${d.Ten_DonVi}</td><td>${d.Ma_DonVi}</td><td>${d.Nguoi_Phu_Trach || ''}</td></tr>`).join('');
+      document.getElementById('bangNamHoc').innerHTML = namHocs.map(n => `
+        <tr><td>${n.Ten_NamHoc}</td><td>${n.Ngay_BatDau}</td><td>${n.Ngay_KetThuc}</td></tr>`).join('');
+      document.getElementById('bangDinhMuc').innerHTML = dinhMucs.map(d => `
+        <tr><td>${d.Hoc_Ham_Hoc_Vi}</td><td>${Number(d.Don_Gia_Gio_Chuan).toLocaleString('vi-VN')}</td><td>${d.Ngay_Hieu_Luc_Tu}</td><td>${d.Ngay_Hieu_Luc_Den || '(chưa xác định)'}</td><td>${d.Can_Cu_Quy_Che || ''}</td></tr>`).join('');
+    }
+
+    async function taoDonVi() {
+      const loiEl = document.getElementById('loiDonVi');
+      loiEl.textContent = '';
+      try {
+        await callApi('taoDonVi', {
+          donVi: {
+            Ten_DonVi: document.getElementById('dvTen').value,
+            Ma_DonVi: document.getElementById('dvMa').value,
+            Nguoi_Phu_Trach: document.getElementById('dvNguoiPhuTrach').value,
+          },
+        });
+        document.getElementById('dvTen').value = '';
+        document.getElementById('dvMa').value = '';
+        document.getElementById('dvNguoiPhuTrach').value = '';
+        taiTatCa();
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+
+    async function taoNamHoc() {
+      const loiEl = document.getElementById('loiNamHoc');
+      loiEl.textContent = '';
+      try {
+        await callApi('taoNamHoc', {
+          namHoc: {
+            Ten_NamHoc: document.getElementById('nhTen').value,
+            Ngay_BatDau: document.getElementById('nhBatDau').value,
+            Ngay_KetThuc: document.getElementById('nhKetThuc').value,
+          },
+        });
+        document.getElementById('nhTen').value = '';
+        taiTatCa();
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+
+    async function taoDinhMuc() {
+      const loiEl = document.getElementById('loiDinhMuc');
+      loiEl.textContent = '';
+      try {
+        await callApi('taoDinhMuc', {
+          dinhMuc: {
+            Hoc_Ham_Hoc_Vi: document.getElementById('dmHocHam').value,
+            Don_Gia_Gio_Chuan: document.getElementById('dmDonGia').value,
+            Ngay_Hieu_Luc_Tu: document.getElementById('dmTuNgay').value,
+            Ngay_Hieu_Luc_Den: document.getElementById('dmDenNgay').value,
+            Can_Cu_Quy_Che: document.getElementById('dmCanCu').value,
+          },
+        });
+        document.getElementById('dmDonGia').value = '';
+        taiTatCa();
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+
+    taiTatCa();
+  </script>
+</body>
+</html>

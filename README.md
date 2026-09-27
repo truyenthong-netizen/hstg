@@ -1,12 +1,12 @@
 # Hệ thống Quản lý Giảng viên Thỉnh giảng và Hợp đồng theo Năm học
 
-Khung mã nguồn (skeleton) cho hệ thống, xây dựng theo tài liệu yêu cầu nghiệp vụ
+Mã nguồn cho hệ thống, xây dựng theo tài liệu yêu cầu nghiệp vụ
 `YCNV_He_thong_QL_Giang_vien_thinh_giang_va_Hop_dong_v2.2.docx`.
 
 ## Kiến trúc
 
 ```
-Trình duyệt (Cloudflare Pages — frontend tĩnh HTML/JS)
+Trình duyệt (Cloudflare Pages/Workers Build — frontend tĩnh HTML/JS)
         │  fetch (JSON)
         ▼
 Cloudflare Worker (proxy — giải quyết CORS)
@@ -22,32 +22,55 @@ Google Sheets (CSDL — 1 sheet = 1 bảng)
 
 ```
 apps-script/         Backend Apps Script (.gs) — API + logic nghiệp vụ + CSDL Sheets
-frontend/             Frontend tĩnh triển khai trên Cloudflare Pages
+frontend/             Frontend tĩnh triển khai trên Cloudflare (Workers Build)
 cloudflare-worker/    Worker proxy giữa frontend và Apps Script Web App
 docs/                 Tài liệu triển khai & đối chiếu schema
 ```
 
 ## Bắt đầu nhanh
 
-Xem hướng dẫn chi tiết từng bước tại [`docs/DEPLOY.md`](docs/DEPLOY.md).
-Đối chiếu cấu trúc dữ liệu với tài liệu nghiệp vụ tại [`docs/SCHEMA.md`](docs/SCHEMA.md).
+1. Xem hướng dẫn chi tiết từng bước tại [`docs/DEPLOY.md`](docs/DEPLOY.md).
+2. Sau khi chạy `initSheets()` và `taoTaiKhoanAdminDauTien()`, chạy thêm
+   `napDuLieuMauDeThuNghiem()` (trong `Sheets_Seed.gs`) để có sẵn dữ liệu mẫu
+   (2 đơn vị, 1 năm học, 2 tài khoản Đơn vị, 2 giảng viên) — chạy thử toàn bộ
+   luồng ngay mà không cần nhập tay từng bước.
+3. Đối chiếu cấu trúc dữ liệu với tài liệu nghiệp vụ tại [`docs/SCHEMA.md`](docs/SCHEMA.md).
 
-## Trạng thái hiện tại — đây là KHUNG (skeleton), chưa phải bản hoàn thiện
+## Tài khoản chạy thử (sau khi seed dữ liệu mẫu)
 
-Đã có, chạy được đầy đủ luồng chính:
-- Đăng nhập/phân quyền Đơn vị – Admin (Auth.gs)
-- Tra cứu CCCD, tạo hồ sơ giảng viên chống trùng (GiangVien.gs)
-- Lập danh sách thỉnh giảng theo đơn vị + năm học (PhanCong.gs)
-- Lập hợp đồng + tự sinh Quyết định 1-1 (HopDong.gs)
-- Ghi nhận Giấy xác nhận giờ giảng, chi tiết theo ma trận Đại học/Sau đại học × loại nội dung (GiayXacNhan.gs, ChiTietGioGiang.gs)
-- Thanh lý hợp đồng: kiểm tra không vượt số giờ theo từng loại, tính thù lao tự động theo học hàm/học vị (ThanhLy.gs, DinhMuc.gs)
-- Nhật ký thao tác append-only (NhatKy.gs)
-- Frontend đủ 4 trang thao tác chính, gọi API qua Worker proxy
+| Vai trò | Tên đăng nhập | Mật khẩu | Ghi chú |
+|---|---|---|---|
+| Admin | `admin` | mật khẩu bạn đặt trong `taoTaiKhoanAdminDauTien` | Toàn quyền: Hợp đồng, Danh mục, Người dùng |
+| Đơn vị | `donvi1` | `123456` | Gắn với "Khoa Y học cổ truyền" |
+| Đơn vị | `donvi2` | `123456` | Gắn với "Khoa Dược" |
 
-Còn là khung/placeholder, cần hoàn thiện thêm trước khi dùng thật:
-- Xuất PDF hợp đồng/quyết định/GCN/biên bản thanh lý từ mẫu Google Docs thật (ExportUtils.gs — đang là TODO với ID mẫu giả)
-- Hệ số quy đổi giờ chuẩn theo từng loại nội dung (đang mặc định = 1)
-- Phân hệ phụ lục hợp đồng đầy đủ có ảnh hưởng tới giới hạn thanh lý (đang mới ghi nhận, chưa cộng vào giới hạn kiểm tra)
-- Giao diện quản trị danh mục (đơn vị, năm học, định mức, người dùng) — hiện chỉ có API, chưa có trang UI riêng
+CCCD mẫu để tra cứu thử: `079001000001` (PGS.TS) hoặc `079001000002` (ThS).
+
+**Đổi ngay mật khẩu mẫu trước khi đưa cho người dùng thật** — đây chỉ là dữ liệu chạy thử nội bộ.
+
+## Trạng thái hiện tại
+
+Đã có, chạy được đầy đủ luồng chính, đủ vai trò:
+
+**Chung**
+- Đăng nhập/phân quyền Đơn vị – Admin (`Auth.gs`), token qua `CacheService`
+- Menu và điều hướng tự ẩn/hiện đúng theo vai trò đăng nhập (`api.js` → `requireRole`, `initNav`)
+- Nhật ký thao tác append-only cho mọi nghiệp vụ quan trọng (`NhatKy.gs`)
+
+**Vai trò Đơn vị**
+- Tra cứu CCCD, tạo hồ sơ giảng viên chống trùng (`GiangVien.gs`, trang `tra-cuu-giang-vien.html`)
+- Lập danh sách thỉnh giảng theo đơn vị + năm học, xuất Excel (`PhanCong.gs`, trang `danh-sach-don-vi.html`)
+- Thanh lý hợp đồng: chọn hợp đồng, nhập giờ thực tế qua Giấy xác nhận, hệ thống tự kiểm tra không vượt giờ (gồm cả phần tăng thêm do phụ lục) và tính thù lao (`ThanhLy.gs`, `GiayXacNhan.gs`, trang `thanh-ly.html`)
+
+**Vai trò Admin**
+- Lập hợp đồng + tự sinh Quyết định 1-1 (`HopDong.gs`, trang `hop-dong.html`)
+- Lập phụ lục điều chỉnh giờ hợp đồng, tự động nới giới hạn thanh lý tương ứng (`PhuLuc.gs`)
+- Quản lý danh mục: đơn vị, năm học, định mức chi thỉnh giảng theo học hàm/học vị (`DonVi_NamHoc.gs`, `DinhMuc.gs`, trang `danh-muc.html`)
+- Quản lý tài khoản người dùng: tạo tài khoản Đơn vị/Admin, khoá/mở tài khoản (`NguoiDung.gs`, trang `nguoi-dung.html`)
+
+Còn là khung/placeholder, cần hoàn thiện thêm trước khi dùng dữ liệu thật:
+- Xuất PDF hợp đồng/quyết định/GCN/biên bản thanh lý từ mẫu Google Docs thật (`ExportUtils.gs` — đang là TODO với ID mẫu giả, cần đơn vị chuyển các file .docx đã cung cấp sang Google Docs và đặt placeholder)
+- Hệ số quy đổi giờ chuẩn theo từng loại nội dung (đang mặc định = 1, cần số thật từ Quy chế chi tiêu nội bộ)
+- Bảo mật đăng nhập ở mức phù hợp production (giới hạn số lần sai, refresh token...) — xem ghi chú trong `Auth.gs`
 
 Danh sách đầy đủ các vấn đề còn mở: xem Mục 12, tài liệu YCNV v2.2.

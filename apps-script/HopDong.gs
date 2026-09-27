@@ -152,3 +152,35 @@ function api_layHopDongTheoId(payload) {
   var hd = sheetToObjects_(SHEETS.HOP_DONG).filter(function (h) { return h.ID_HopDong === payload.idHopDong; })[0];
   return okResponse_(hd || null);
 }
+
+/**
+ * Admin: liet ke toan bo hop dong (tuy chon loc theo don vi/nam hoc/trang thai),
+ * kem ten giang vien va ten don vi de hien thi o giao dien quan ly hop dong.
+ */
+function api_danhSachHopDong(payload) {
+  yeuCauAdmin_(payload.token);
+  var giangViens = sheetToObjects_(SHEETS.GIANG_VIEN);
+  var donVis = sheetToObjects_(SHEETS.DON_VI);
+  var gvMap = {};
+  giangViens.forEach(function (gv) { gvMap[gv.ID_GiangVien] = gv; });
+  var dvMap = {};
+  donVis.forEach(function (dv) { dvMap[dv.ID_DonVi] = dv; });
+
+  var all = sheetToObjects_(SHEETS.HOP_DONG).filter(function (hd) {
+    return (!payload.idDonVi || hd.ID_DonVi === payload.idDonVi) &&
+      (!payload.idNamHoc || hd.ID_NamHoc === payload.idNamHoc) &&
+      (!payload.trangThai || hd.Trang_Thai === payload.trangThai);
+  });
+
+  var result = all.map(function (hd) {
+    var gv = gvMap[hd.ID_GiangVien] || {};
+    var dv = dvMap[hd.ID_DonVi] || {};
+    return Object.assign({}, hd, {
+      Ho_Ten_GiangVien: gv.Ho_Ten,
+      Hoc_Ham_Hoc_Vi: gv.Hoc_Ham_Hoc_Vi,
+      Ten_DonVi: dv.Ten_DonVi,
+    });
+  });
+  result.sort(function (a, b) { return new Date(b.Ngay_Tao) - new Date(a.Ngay_Tao); });
+  return okResponse_(result);
+}

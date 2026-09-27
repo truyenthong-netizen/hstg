@@ -1,14 +1,12 @@
 /**
  * ThanhLy.gs — Bước 8, 9, 10, 11 tài liệu YCNV. Đây là phần kiểm soát chặt nhất hệ thống:
  * - Số giờ thực tế (GCN) theo từng (loại nội dung, cấp bậc) KHÔNG được vượt số giờ
- *   dự kiến trong hợp đồng tương ứng (Bước 10).
+ *   dự kiến trong hợp đồng gốc CỘNG với phần tăng thêm từ phụ lục (nếu có) — xem
+ *   ghi chú trong PhuLuc.gs: phụ lục ghi thêm dòng CHI_TIET_GIO_GIANG (Nguon='HopDong'),
+ *   nên hàm gomTheoLoaiVaCapBac_ dưới đây tự động cộng dồn đúng mà không cần xử lý riêng.
  * - Mỗi hợp đồng chỉ thanh lý đúng 1 lần (ràng buộc UNIQUE ID_HopDong ở THANH_LY_HOP_DONG,
  *   tự kiểm tra vì Sheets không có UNIQUE thật).
  * - Thù lao = Tổng giờ chuẩn thực tế × Định mức theo học hàm/học vị của giảng viên (Mục 9.9).
- *
- * TODO: nếu hợp đồng có phụ lục điều chỉnh số giờ (PHU_LUC_HOP_DONG), giới hạn kiểm tra
- * phải cộng thêm phần điều chỉnh — bản khung này mới kiểm tra theo số giờ gốc của hợp đồng,
- * cần bổ sung khi phân hệ phụ lục được làm đầy đủ (xem Mục 12 tài liệu YCNV).
  */
 
 function sinhMaSoBienBan_() {

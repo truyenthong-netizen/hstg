@@ -12,6 +12,12 @@ var ACTION_MAP = {
   // Auth
   dangNhap: api_dangNhap,
   dangXuat: api_dangXuat,
+  doiMatKhauCuaToi: api_doiMatKhauCuaToi,
+
+  // Người dùng (Admin quản lý tài khoản)
+  danhSachNguoiDung: api_danhSachNguoiDung,
+  taoNguoiDung: api_taoNguoiDung,
+  suaNguoiDung: api_suaNguoiDung,
 
   // Danh mục
   danhSachDonVi: api_danhSachDonVi,
@@ -38,6 +44,7 @@ var ACTION_MAP = {
   chuyenTrangThaiHopDong: api_chuyenTrangThaiHopDong,
   layHopDongChoThanhLy: api_layHopDongChoThanhLy,
   layHopDongTheoId: api_layHopDongTheoId,
+  danhSachHopDong: api_danhSachHopDong,
   xuatFileHopDong: api_xuatFileHopDong,
 
   // Chi tiết giờ giảng

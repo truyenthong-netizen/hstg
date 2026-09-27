@@ -10,10 +10,13 @@
   <header class="topbar">
     <strong>QL Giảng viên thỉnh giảng</strong>
     <nav>
-      <a href="tra-cuu-giang-vien.html">Tra cứu / Lập danh sách</a>
-      <a href="danh-sach-don-vi.html">Danh sách đơn vị</a>
-      <a href="hop-dong.html">Hợp đồng</a>
-      <a href="thanh-ly.html">Thanh lý</a>
+      <a href="tra-cuu-giang-vien.html" data-role="DonVi">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html" data-role="DonVi">Danh sách đơn vị</a>
+      <a href="thanh-ly.html" data-role="DonVi">Thanh lý</a>
+      <a href="hop-dong.html" data-role="Admin">Hợp đồng</a>
+      <a href="danh-muc.html" data-role="Admin">Danh mục</a>
+      <a href="nguoi-dung.html" data-role="Admin">Người dùng</a>
+      <span id="hoTenHienTai" style="margin-right:12px; font-size:13px; opacity:0.85;"></span>
       <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
     </nav>
   </header>
@@ -80,7 +83,8 @@
 
   <script src="../assets/js/api.js"></script>
   <script>
-    requireLogin();
+    requireRole('DonVi');
+    initNav();
     let giangVienHienTai = null;
 
     async function napNamHoc() {

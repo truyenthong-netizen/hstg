@@ -10,10 +10,13 @@
   <header class="topbar">
     <strong>QL Giảng viên thỉnh giảng</strong>
     <nav>
-      <a href="tra-cuu-giang-vien.html">Tra cứu / Lập danh sách</a>
-      <a href="danh-sach-don-vi.html">Danh sách đơn vị</a>
-      <a href="hop-dong.html">Hợp đồng</a>
-      <a href="thanh-ly.html">Thanh lý</a>
+      <a href="tra-cuu-giang-vien.html" data-role="DonVi">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html" data-role="DonVi">Danh sách đơn vị</a>
+      <a href="thanh-ly.html" data-role="DonVi">Thanh lý</a>
+      <a href="hop-dong.html" data-role="Admin">Hợp đồng</a>
+      <a href="danh-muc.html" data-role="Admin">Danh mục</a>
+      <a href="nguoi-dung.html" data-role="Admin">Người dùng</a>
+      <span id="hoTenHienTai" style="margin-right:12px; font-size:13px; opacity:0.85;"></span>
       <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
     </nav>
   </header>
@@ -45,11 +48,50 @@
       <div id="loi" class="error"></div>
       <div id="thanhCong" style="color:#1a7a35; margin-top:8px;"></div>
     </div>
+
+    <div class="card">
+      <h2>Bước 6-7 — Quản lý hợp đồng đã lập</h2>
+      <label>Lọc theo trạng thái</label>
+      <select id="locTrangThai" onchange="taiDanhSachHopDong()">
+        <option value="">Tất cả</option>
+        <option value="Du_Thao">Dự thảo</option>
+        <option value="Da_Ky">Đã ký / Có hiệu lực</option>
+        <option value="Da_Thanh_Ly">Đã thanh lý</option>
+        <option value="Huy">Đã huỷ</option>
+      </select>
+      <table>
+        <thead>
+          <tr><th>Số hợp đồng</th><th>Giảng viên</th><th>Đơn vị</th><th>Trạng thái</th><th>Thao tác</th></tr>
+        </thead>
+        <tbody id="bangHopDong"></tbody>
+      </table>
+      <div id="loiQuanLy" class="error"></div>
+    </div>
+
+    <div class="card" id="cardPhuLuc" style="display:none;">
+      <h2>Lập phụ lục điều chỉnh hợp đồng</h2>
+      <p>Hợp đồng: <strong id="plMaSoHopDong"></strong></p>
+      <label>Nội dung điều chỉnh *</label>
+      <input id="plNoiDung" placeholder="VD: Tăng số giờ hướng dẫn luận văn" />
+      <label>Giá trị trước</label><input id="plGiaTriTruoc" />
+      <label>Giá trị sau</label><input id="plGiaTriSau" />
+      <h3>Điều chỉnh tăng số giờ (tuỳ chọn)</h3>
+      <label>Loại nội dung</label>
+      <select id="plLoaiNoiDung"></select>
+      <label>Cấp bậc</label>
+      <select id="plCapBac"><option value="DaiHoc">Đại học</option><option value="SauDaiHoc">Sau đại học</option></select>
+      <label>Số giờ tăng thêm</label><input id="plSoGioTang" type="number" min="0" />
+      <button onclick="luuPhuLuc()">Lưu phụ lục</button>
+      <button class="secondary" onclick="dongPhuLuc()">Đóng</button>
+      <div id="loiPhuLuc" class="error"></div>
+      <div id="thanhCongPhuLuc" style="color:#1a7a35; margin-top:8px;"></div>
+    </div>
   </main>
 
   <script src="../assets/js/api.js"></script>
   <script>
-    requireLogin();
+    requireRole('Admin');
+    initNav();
     let giangVienChon = null;
     let danhMucNoiDung = [];
 
@@ -68,6 +110,8 @@
           <td><input type="number" min="0" id="dh_${nd.ID_NoiDung}" style="width:80px;" /></td>
           <td><input type="number" min="0" id="sdh_${nd.ID_NoiDung}" style="width:80px;" /></td>
         </tr>`).join('');
+      document.getElementById('plLoaiNoiDung').innerHTML = noiDungs.map(nd => `<option value="${nd.ID_NoiDung}">${nd.Ten_NoiDung}</option>`).join('');
+      taiDanhSachHopDong();
     }
     khoiTao();
 
@@ -114,6 +158,108 @@
         const result = await callApi('taoHopDong', { hopDong });
         document.getElementById('thanhCong').textContent =
           `Đã tạo hợp đồng ${result.hopDong.Ma_So_HopDong} kèm Quyết định ${result.quyetDinh.Ma_So_QuyetDinh} (trạng thái: Dự thảo).`;
+        taiDanhSachHopDong();
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+
+    const TEN_TRANG_THAI = {
+      Du_Thao: 'Dự thảo', Da_Ky: 'Đã ký/Có hiệu lực', Da_Thanh_Ly: 'Đã thanh lý', Huy: 'Đã huỷ',
+    };
+
+    async function taiDanhSachHopDong() {
+      const loiEl = document.getElementById('loiQuanLy');
+      loiEl.textContent = '';
+      try {
+        const trangThai = document.getElementById('locTrangThai').value;
+        const list = await callApi('danhSachHopDong', { trangThai });
+        document.getElementById('bangHopDong').innerHTML = list.map(hd => {
+          const nutChuyenDaKy = hd.Trang_Thai === 'Du_Thao'
+            ? `<button onclick="chuyenDaKy('${hd.ID_HopDong}')">Chuyển Đã ký</button>` : '';
+          const nutHuy = (hd.Trang_Thai === 'Du_Thao' || hd.Trang_Thai === 'Da_Ky')
+            ? `<button class="secondary" onclick="huyHopDong('${hd.ID_HopDong}')">Huỷ</button>` : '';
+          const nutPhuLuc = hd.Trang_Thai === 'Da_Ky'
+            ? `<button class="secondary" onclick='moPhuLuc(${JSON.stringify(hd)})'>Lập phụ lục</button>` : '';
+          return `
+            <tr>
+              <td>${hd.Ma_So_HopDong}</td>
+              <td>${hd.Ho_Ten_GiangVien || ''} (${hd.Hoc_Ham_Hoc_Vi || ''})</td>
+              <td>${hd.Ten_DonVi || ''}</td>
+              <td><span class="badge ${hd.Trang_Thai}">${TEN_TRANG_THAI[hd.Trang_Thai] || hd.Trang_Thai}</span></td>
+              <td>${nutChuyenDaKy} ${nutHuy} ${nutPhuLuc}</td>
+            </tr>`;
+        }).join('');
+      } catch (err) {
+        loiEl.textContent = err.message;
+      }
+    }
+
+    async function chuyenDaKy(idHopDong) {
+      if (!confirm('Xác nhận chuyển hợp đồng sang trạng thái Đã ký/Có hiệu lực?')) return;
+      try {
+        await callApi('chuyenTrangThaiHopDong', { idHopDong, trangThaiMoi: 'Da_Ky' });
+        taiDanhSachHopDong();
+      } catch (err) {
+        document.getElementById('loiQuanLy').textContent = err.message;
+      }
+    }
+
+    async function huyHopDong(idHopDong) {
+      const lyDoHuy = prompt('Nhập lý do huỷ hợp đồng:');
+      if (!lyDoHuy) return;
+      try {
+        await callApi('chuyenTrangThaiHopDong', { idHopDong, trangThaiMoi: 'Huy', lyDoHuy });
+        taiDanhSachHopDong();
+      } catch (err) {
+        document.getElementById('loiQuanLy').textContent = err.message;
+      }
+    }
+
+    let hopDongDangLapPhuLuc = null;
+
+    function moPhuLuc(hd) {
+      hopDongDangLapPhuLuc = hd;
+      document.getElementById('plMaSoHopDong').textContent = hd.Ma_So_HopDong;
+      document.getElementById('cardPhuLuc').style.display = 'block';
+      document.getElementById('loiPhuLuc').textContent = '';
+      document.getElementById('thanhCongPhuLuc').textContent = '';
+      window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function dongPhuLuc() {
+      document.getElementById('cardPhuLuc').style.display = 'none';
+      hopDongDangLapPhuLuc = null;
+    }
+
+    async function luuPhuLuc() {
+      const loiEl = document.getElementById('loiPhuLuc');
+      loiEl.textContent = '';
+      const noiDung = document.getElementById('plNoiDung').value.trim();
+      if (!noiDung) { loiEl.textContent = 'Nhập nội dung điều chỉnh'; return; }
+
+      const soGioTang = Number(document.getElementById('plSoGioTang').value || 0);
+      const phuLuc = {
+        ID_HopDong: hopDongDangLapPhuLuc.ID_HopDong,
+        Noi_Dung_Dieu_Chinh: noiDung,
+        GiaTri_Truoc: document.getElementById('plGiaTriTruoc').value,
+        GiaTri_Sau: document.getElementById('plGiaTriSau').value,
+      };
+      if (soGioTang > 0) {
+        phuLuc.dieuChinhGio = {
+          ID_NoiDung: document.getElementById('plLoaiNoiDung').value,
+          Cap_Bac: document.getElementById('plCapBac').value,
+          So_Gio_Tang: soGioTang,
+        };
+      }
+
+      try {
+        const result = await callApi('taoPhuLuc', { phuLuc });
+        document.getElementById('thanhCongPhuLuc').textContent = `Đã lưu phụ lục ${result.ID_PhuLuc}.`;
+        document.getElementById('plNoiDung').value = '';
+        document.getElementById('plGiaTriTruoc').value = '';
+        document.getElementById('plGiaTriSau').value = '';
+        document.getElementById('plSoGioTang').value = '';
       } catch (err) {
         loiEl.textContent = err.message;
       }

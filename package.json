@@ -10,10 +10,10 @@
     "clasp:deploy": "cd apps-script && clasp deploy",
     "worker:dev": "cd cloudflare-worker && wrangler dev",
     "worker:deploy": "cd cloudflare-worker && wrangler deploy",
-    "pages:deploy": "wrangler pages deploy frontend --project-name=qlgv-thinhgiang"
+    "frontend:deploy": "cd frontend && wrangler deploy"
   },
   "devDependencies": {
     "@google/clasp": "^2.4.2",
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.0.0"
   }
 }

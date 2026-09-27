@@ -33,6 +33,7 @@ function api_dangNhap(payload) {
 
   return okResponse_({
     token: token,
+    idNguoiDung: user.ID_NguoiDung,
     hoTen: user.Ho_Ten,
     vaiTro: user.Vai_Tro,
     idDonVi: user.ID_DonVi,
