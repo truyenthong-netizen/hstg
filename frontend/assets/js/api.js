@@ -4,7 +4,7 @@
  * QUAN TRỌNG: API_BASE_URL nên trỏ tới Cloudflare Worker proxy (xem /cloudflare-worker),
  * KHÔNG trỏ thẳng URL Apps Script, để tránh vướng CORS (xem ghi chú trong Code.gs).
  */
-const API_BASE_URL = 'https://URL_WORKER_PROXY_CUA_BAN.tccb.workers.dev'; // TODO: đổi sau khi deploy Worker
+const API_BASE_URL = 'https://hstg.tccb.workers.dev'; // TODO: đổi sau khi deploy Worker
 
 function getToken() {
   return localStorage.getItem('token');
