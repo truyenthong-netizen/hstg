@@ -41,3 +41,55 @@ function api_taoDinhMuc(payload) {
   ghiNhatKy_('DINH_MUC_DON_GIA', record.ID_DinhMuc, 'Tao_Moi', null, record, session.tenDangNhap);
   return okResponse_(record);
 }
+
+/** true nếu định mức này đã được dùng để tính thù lao ít nhất 1 lần thanh lý. */
+function dinhMucDaDuocDung_(idDinhMuc) {
+  return sheetToObjects_(SHEETS.THANH_LY_HOP_DONG).some(function (tl) { return tl.ID_DinhMuc === idDinhMuc; });
+}
+
+/**
+ * Admin sửa định mức. Nếu định mức đã được dùng để thanh lý ít nhất 1 hợp đồng,
+ * KHÔNG cho đổi Học hàm/học vị hoặc Đơn giá (sẽ làm sai lệch cách hiểu số liệu đã tính) —
+ * chỉ cho sửa Ngày hiệu lực đến / Căn cứ trong trường hợp đó. Muốn đổi đơn giá, thêm dòng mới.
+ */
+function api_suaDinhMuc(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.DINH_MUC_DON_GIA);
+  var target = all.filter(function (dm) { return dm.ID_DinhMuc === payload.idDinhMuc; })[0];
+  if (!target) return errorResponse_('Không tìm thấy định mức', 'NOT_FOUND');
+
+  var p = payload.patch || {};
+  var daDung = dinhMucDaDuocDung_(target.ID_DinhMuc);
+  if (daDung && ((p.Don_Gia_Gio_Chuan !== undefined && Number(p.Don_Gia_Gio_Chuan) !== Number(target.Don_Gia_Gio_Chuan)) ||
+    (p.Hoc_Ham_Hoc_Vi && p.Hoc_Ham_Hoc_Vi !== target.Hoc_Ham_Hoc_Vi))) {
+    return errorResponse_('Định mức này đã được dùng để thanh lý ít nhất 1 hợp đồng — không thể đổi học hàm/học vị hoặc đơn giá. Chỉ có thể sửa ngày hiệu lực đến/căn cứ, hoặc thêm dòng định mức mới.', 'IN_USE');
+  }
+
+  var patch = {};
+  if (!daDung && p.Hoc_Ham_Hoc_Vi) patch.Hoc_Ham_Hoc_Vi = p.Hoc_Ham_Hoc_Vi;
+  if (!daDung && p.Don_Gia_Gio_Chuan !== undefined) patch.Don_Gia_Gio_Chuan = Number(p.Don_Gia_Gio_Chuan);
+  if (!daDung && p.Ngay_Hieu_Luc_Tu) patch.Ngay_Hieu_Luc_Tu = p.Ngay_Hieu_Luc_Tu;
+  if (p.Ngay_Hieu_Luc_Den !== undefined) patch.Ngay_Hieu_Luc_Den = p.Ngay_Hieu_Luc_Den;
+  if (p.Can_Cu_Quy_Che !== undefined) patch.Can_Cu_Quy_Che = p.Can_Cu_Quy_Che;
+
+  var before = { Hoc_Ham_Hoc_Vi: target.Hoc_Ham_Hoc_Vi, Don_Gia_Gio_Chuan: target.Don_Gia_Gio_Chuan, Ngay_Hieu_Luc_Tu: target.Ngay_Hieu_Luc_Tu, Ngay_Hieu_Luc_Den: target.Ngay_Hieu_Luc_Den, Can_Cu_Quy_Che: target.Can_Cu_Quy_Che };
+  updateRow_(SHEETS.DINH_MUC_DON_GIA, target.__row, patch);
+  ghiNhatKy_('DINH_MUC_DON_GIA', target.ID_DinhMuc, 'Chinh_Sua', before, patch, session.tenDangNhap);
+  return okResponse_({});
+}
+
+/** Xoá định mức — chỉ cho phép nếu chưa từng được dùng để thanh lý hợp đồng nào. */
+function api_xoaDinhMuc(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.DINH_MUC_DON_GIA);
+  var target = all.filter(function (dm) { return dm.ID_DinhMuc === payload.idDinhMuc; })[0];
+  if (!target) return errorResponse_('Không tìm thấy định mức', 'NOT_FOUND');
+
+  if (dinhMucDaDuocDung_(target.ID_DinhMuc)) {
+    return errorResponse_('Định mức này đã được dùng để thanh lý ít nhất 1 hợp đồng — không thể xoá (sẽ mất căn cứ tính thù lao đã có). Có thể sửa Ngày hiệu lực đến để ngừng dùng.', 'IN_USE');
+  }
+
+  deleteRow_(SHEETS.DINH_MUC_DON_GIA, target.__row);
+  ghiNhatKy_('DINH_MUC_DON_GIA', target.ID_DinhMuc, 'Xoa', { Hoc_Ham_Hoc_Vi: target.Hoc_Ham_Hoc_Vi, Don_Gia_Gio_Chuan: target.Don_Gia_Gio_Chuan }, null, session.tenDangNhap);
+  return okResponse_({});
+}

@@ -11,28 +11,38 @@
     <div class="card">
       <h1 style="text-align:center;">Đăng nhập</h1>
       <label>Tên đăng nhập</label>
-      <input id="tenDangNhap" type="text" autocomplete="username" />
+      <input id="tenDangNhap" type="text" autocomplete="username" onkeydown="neuEnterThiDangNhap(event)" />
       <label>Mật khẩu</label>
-      <input id="matKhau" type="password" autocomplete="current-password" />
-      <button onclick="dangNhap()">Đăng nhập</button>
+      <input id="matKhau" type="password" autocomplete="current-password" onkeydown="neuEnterThiDangNhap(event)" />
+      <button id="nutDangNhap" onclick="dangNhap(this)">Đăng nhập</button>
       <div id="loi" class="error"></div>
     </div>
   </main>
 
   <script src="assets/js/api.js"></script>
   <script>
-    async function dangNhap() {
+    function neuEnterThiDangNhap(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        dangNhap(document.getElementById('nutDangNhap'));
+      }
+    }
+
+    async function dangNhap(btn) {
       const tenDangNhap = document.getElementById('tenDangNhap').value.trim();
       const matKhau = document.getElementById('matKhau').value;
       const loiEl = document.getElementById('loi');
       loiEl.textContent = '';
-      try {
-        const data = await callApi('dangNhap', { tenDangNhap, matKhau });
-        setSession(data);
-        window.location.href = data.vaiTro === 'Admin' ? 'pages/hop-dong.html' : 'pages/tra-cuu-giang-vien.html';
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+      if (!tenDangNhap || !matKhau) { loiEl.textContent = 'Nhập đủ tên đăng nhập và mật khẩu'; return; }
+      await chayVoiNutBan(btn, 'Đang đăng nhập...', async () => {
+        try {
+          const data = await callApi('dangNhap', { tenDangNhap, matKhau });
+          setSession(data);
+          window.location.href = data.vaiTro === 'Admin' ? 'pages/hop-dong.html' : 'pages/tra-cuu-giang-vien.html';
+        } catch (err) {
+          loiEl.textContent = err.message;
+        }
+      });
     }
   </script>
 </body>

@@ -54,9 +54,10 @@
 
     <div class="card">
       <h2>Định mức chi thỉnh giảng theo học hàm/học vị</h2>
-      <p style="font-size:13px; color:#555;">Theo Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV). Khi thay định mức, thêm dòng mới với ngày hiệu lực mới — không sửa/xoá dòng cũ, để giữ đúng lịch sử tính thù lao các hợp đồng trước đó. Vì vậy màn hình này chỉ cho phép thêm mới.</p>
+      <p style="font-size:13px; color:#555;">Theo Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV). Định mức nào đã được dùng để thanh lý ít nhất 1 hợp đồng sẽ không cho đổi học hàm/đơn giá hoặc xoá nữa (chỉ sửa được ngày hiệu lực đến/căn cứ) — muốn đổi đơn giá, thêm dòng mới với ngày hiệu lực mới, để giữ đúng lịch sử tính thù lao các hợp đồng trước đó.</p>
+      <div id="thongDiepDinhMucBang" style="margin-bottom:8px;"></div>
       <table>
-        <thead><tr><th>Học hàm/học vị</th><th>Đơn giá (đ/tiết chuẩn)</th><th>Hiệu lực từ</th><th>Hiệu lực đến</th><th>Căn cứ</th></tr></thead>
+        <thead><tr><th>Học hàm/học vị</th><th>Đơn giá (đ/tiết chuẩn)</th><th>Hiệu lực từ</th><th>Hiệu lực đến</th><th>Căn cứ</th><th>Thao tác</th></tr></thead>
         <tbody id="bangDinhMuc"></tbody>
       </table>
       <h3>Thêm định mức mới</h3>
@@ -83,6 +84,7 @@
     let dsDinhMuc = [];
     let idDonViDangSua = null;
     let idNamHocDangSua = null;
+    let idDinhMucDangSua = null;
 
     async function taiTatCa() {
       const [donVis, namHocs, dinhMucs] = await Promise.all([
@@ -211,9 +213,73 @@
       });
     }
 
+    const HOC_HAM_HOC_VI_TUY_CHON = ['GS.TS', 'PGS.TS', 'TS', 'ThS', 'Đại học'];
+
     function veDinhMuc() {
-      document.getElementById('bangDinhMuc').innerHTML = dsDinhMuc.map(d => `
-        <tr><td>${d.Hoc_Ham_Hoc_Vi}</td><td>${Number(d.Don_Gia_Gio_Chuan).toLocaleString('vi-VN')}</td><td>${d.Ngay_Hieu_Luc_Tu}</td><td>${d.Ngay_Hieu_Luc_Den || '(chưa xác định)'}</td><td>${d.Can_Cu_Quy_Che || ''}</td></tr>`).join('');
+      document.getElementById('bangDinhMuc').innerHTML = dsDinhMuc.map(d => {
+        if (d.ID_DinhMuc === idDinhMucDangSua) {
+          return `
+          <tr>
+            <td>
+              <select id="sdm_hocham_${d.ID_DinhMuc}">
+                ${HOC_HAM_HOC_VI_TUY_CHON.map(h => `<option ${h === d.Hoc_Ham_Hoc_Vi ? 'selected' : ''}>${h}</option>`).join('')}
+              </select>
+            </td>
+            <td><input id="sdm_dongia_${d.ID_DinhMuc}" type="number" value="${Number(d.Don_Gia_Gio_Chuan)}" style="width:110px;" /></td>
+            <td><input id="sdm_tungay_${d.ID_DinhMuc}" type="date" value="${d.Ngay_Hieu_Luc_Tu || ''}" /></td>
+            <td><input id="sdm_denngay_${d.ID_DinhMuc}" type="date" value="${d.Ngay_Hieu_Luc_Den || ''}" /></td>
+            <td><input id="sdm_cancu_${d.ID_DinhMuc}" value="${escAttr(d.Can_Cu_Quy_Che || '')}" /></td>
+            <td>
+              <button onclick="suaDinhMucLuu(this, '${d.ID_DinhMuc}')">Lưu</button>
+              <button class="secondary" onclick="suaDinhMucHuy()">Huỷ</button>
+            </td>
+          </tr>`;
+        }
+        return `
+        <tr>
+          <td>${d.Hoc_Ham_Hoc_Vi}</td><td>${Number(d.Don_Gia_Gio_Chuan).toLocaleString('vi-VN')}</td><td>${d.Ngay_Hieu_Luc_Tu}</td><td>${d.Ngay_Hieu_Luc_Den || '(chưa xác định)'}</td><td>${d.Can_Cu_Quy_Che || ''}</td>
+          <td>
+            <button class="secondary" onclick="suaDinhMucBatDau('${d.ID_DinhMuc}')">Sửa</button>
+            <button class="secondary" onclick="xoaDinhMuc(this, '${d.ID_DinhMuc}', '${escAttr(d.Hoc_Ham_Hoc_Vi)}')">Xoá</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function suaDinhMucBatDau(id) { idDinhMucDangSua = id; veDinhMuc(); }
+    function suaDinhMucHuy() { idDinhMucDangSua = null; veDinhMuc(); }
+
+    async function suaDinhMucLuu(btn, id) {
+      const patch = {
+        Hoc_Ham_Hoc_Vi: document.getElementById('sdm_hocham_' + id).value,
+        Don_Gia_Gio_Chuan: document.getElementById('sdm_dongia_' + id).value,
+        Ngay_Hieu_Luc_Tu: document.getElementById('sdm_tungay_' + id).value,
+        Ngay_Hieu_Luc_Den: document.getElementById('sdm_denngay_' + id).value,
+        Can_Cu_Quy_Che: document.getElementById('sdm_cancu_' + id).value,
+      };
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('suaDinhMuc', { idDinhMuc: id, patch });
+          idDinhMucDangSua = null;
+          baoThongDiep('thongDiepDinhMucBang', 'Đã cập nhật định mức.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepDinhMucBang', err.message, false);
+        }
+      });
+    }
+
+    async function xoaDinhMuc(btn, id, ten) {
+      if (!confirm('Xoá hẳn định mức "' + ten + '"? Không thể hoàn tác.')) return;
+      await chayVoiNutBan(btn, 'Đang xoá...', async () => {
+        try {
+          await callApi('xoaDinhMuc', { idDinhMuc: id });
+          baoThongDiep('thongDiepDinhMucBang', 'Đã xoá định mức.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepDinhMucBang', err.message, false);
+        }
+      });
     }
 
     async function taoDonVi(btn) {
