@@ -27,11 +27,24 @@ function sheetToObjects_(sheetName) {
   return out;
 }
 
+/**
+ * Ép giá trị của các cột trong TEXT_FIELDS (CCCD, SĐT, số tài khoản, mã số thuế...)
+ * luôn được Sheets lưu dưới dạng văn bản, không tự chuyển thành number (tránh mất số 0
+ * đứng đầu). Cách làm: thêm dấu nháy đơn ở đầu chuỗi trước khi ghi — đây là cách Google
+ * Sheets nhận biết "ép kiểu văn bản" dù ghi qua giao diện hay qua Apps Script.
+ */
+function ep_ChuoiSo_(colName, value) {
+  if (TEXT_FIELDS.indexOf(colName) === -1) return value;
+  if (value === '' || value === null || value === undefined) return value;
+  var s = String(value);
+  return s.charAt(0) === "'" ? s : "'" + s;
+}
+
 /** Ghi thêm 1 dòng vào sheet theo đúng thứ tự cột trong SCHEMA. */
 function appendRow_(sheetName, obj) {
   var sh = getSheet_(sheetName);
   var cols = SCHEMA[sheetName];
-  var row = cols.map(function (c) { return obj[c] !== undefined ? obj[c] : ''; });
+  var row = cols.map(function (c) { return ep_ChuoiSo_(c, obj[c] !== undefined ? obj[c] : ''); });
   sh.appendRow(row);
   return obj;
 }
@@ -42,7 +55,8 @@ function updateRow_(sheetName, rowIndex, patch) {
   var cols = SCHEMA[sheetName];
   var current = sh.getRange(rowIndex, 1, 1, cols.length).getValues()[0];
   var updated = cols.map(function (c, i) {
-    return patch[c] !== undefined ? patch[c] : current[i];
+    var v = patch[c] !== undefined ? patch[c] : current[i];
+    return ep_ChuoiSo_(c, v);
   });
   sh.getRange(rowIndex, 1, 1, cols.length).setValues([updated]);
   return updated;

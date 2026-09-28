@@ -107,6 +107,11 @@ var SCHEMA = {
   ],
 };
 
+// Các cột chứa chuỗi số nhưng PHẢI giữ nguyên dạng văn bản (không được để Sheets tự hiểu
+// thành number) — vì nếu không, số 0 đứng đầu (CCCD, SĐT, số tài khoản, mã số thuế...) sẽ
+// bị mất khi ghi xuống. Xem ep_ChuoiSo_ trong Utils.gs (dùng trong appendRow_/updateRow_).
+var TEXT_FIELDS = ['So_CCCD', 'So_Dien_Thoai', 'So_Tai_Khoan', 'Ma_So_Thue'];
+
 // Danh mục cố định loại nội dung giảng dạy (nạp sẵn khi initSheets chạy lần đầu).
 // Hệ số quy đổi để 0 — CẦN ĐƠN VỊ CUNG CẤP số thật (xem Mục 12 tài liệu YCNV, vấn đề còn mở).
 var NOI_DUNG_GIANG_DAY_MAC_DINH = [
