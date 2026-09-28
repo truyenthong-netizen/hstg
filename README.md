@@ -61,11 +61,12 @@ CCCD mẫu để tra cứu thử: `079001000001` (PGS.TS) hoặc `079001000002` 
 
 **Vai trò Đơn vị**
 - Tra cứu CCCD, tạo hồ sơ giảng viên chống trùng (`GiangVien.gs`, trang `tra-cuu-giang-vien.html`)
-- Lập danh sách thỉnh giảng theo đơn vị + năm học, xuất Excel (`PhanCong.gs`, trang `danh-sach-don-vi.html`)
+- Lập danh sách thỉnh giảng theo đơn vị + năm học (`PhanCong.gs`, trang `danh-sach-don-vi.html`)
+- Nộp giờ giảng dự kiến theo loại nội dung/cấp bậc bằng xuất/nhập file Excel ngay trên trình duyệt (thư viện SheetJS, không qua Apps Script) — đây là **nguồn duy nhất** của số giờ dự kiến; Admin không tự nhập tay số này khi lập hợp đồng, chỉ xem lại để xác nhận (`api_nhapGioDuKienTuExcel` trong `PhanCong.gs`, trang `danh-sach-don-vi.html`)
 - Thanh lý hợp đồng: chọn hợp đồng, nhập giờ thực tế qua Giấy xác nhận, hệ thống tự kiểm tra không vượt giờ (gồm cả phần tăng thêm do phụ lục) và tính thù lao (`ThanhLy.gs`, `GiayXacNhan.gs`, trang `thanh-ly.html`)
 
 **Vai trò Admin**
-- Lập hợp đồng + tự sinh Quyết định 1-1 (`HopDong.gs`, trang `hop-dong.html`)
+- Lập hợp đồng + tự sinh Quyết định 1-1; số giờ dự kiến hiển thị chỉ-đọc, lấy đúng theo file Excel đơn vị đã nộp — không có ô nhập tay (`HopDong.gs`, trang `hop-dong.html`)
 - Lập phụ lục điều chỉnh giờ hợp đồng, tự động nới giới hạn thanh lý tương ứng (`PhuLuc.gs`)
 - Quản lý danh mục: thêm/sửa/xoá đơn vị, thêm/sửa/xoá năm học (xoá bị chặn nếu đã có hợp đồng/danh sách gắn kèm), thêm định mức chi thỉnh giảng theo học hàm/học vị — riêng định mức chỉ cho thêm mới, không sửa/xoá, để giữ đúng lịch sử tính thù lao (`DonVi_NamHoc.gs`, `DinhMuc.gs`, trang `danh-muc.html`)
 - Quản lý tài khoản người dùng: tạo/sửa (họ tên, vai trò, đơn vị)/khoá-mở/xoá tài khoản; luôn giữ lại ít nhất 1 tài khoản Admin đang hoạt động (`NguoiDung.gs`, trang `nguoi-dung.html`)

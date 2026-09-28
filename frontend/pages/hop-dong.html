@@ -30,21 +30,23 @@
       <div id="thongTinGV" style="margin-top:8px; font-size:14px;"></div>
 
       <label>Đơn vị *</label>
-      <select id="donViChon"></select>
+      <select id="donViChon" onchange="timPhanCong()"></select>
       <label>Năm học *</label>
-      <select id="namHocChon"></select>
+      <select id="namHocChon" onchange="timPhanCong()"></select>
       <label>Nội dung giảng dạy (mô tả chung)</label>
       <input id="noiDungGiangDay" />
       <label>Từ ngày</label><input id="tuNgay" type="date" />
       <label>Đến ngày</label><input id="denNgay" type="date" />
 
       <h3>Số giờ dự kiến theo loại nội dung</h3>
+      <p style="font-size:13px; color:#555;">Số giờ này do đơn vị nộp qua Excel (trang Danh sách đơn vị) — Admin không tự nhập, chỉ xem lại để xác nhận trước khi lập hợp đồng.</p>
+      <div id="thongDiepPhanCong" style="margin-bottom:8px;"></div>
       <table>
         <thead><tr><th>Loại nội dung</th><th>Đại học</th><th>Sau đại học</th></tr></thead>
-        <tbody id="bangGioDuKien"></tbody>
+        <tbody id="bangGioDuKien"><tr><td colspan="3" style="color:#777;">Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.</td></tr></tbody>
       </table>
 
-      <button onclick="taoHopDong(this)">Lập hợp đồng + sinh Quyết định</button>
+      <button id="nutTaoHopDong" onclick="taoHopDong(this)" disabled>Lập hợp đồng + sinh Quyết định</button>
       <div id="loi" class="error"></div>
       <div id="thanhCong" style="color:#1a7a35; margin-top:8px;"></div>
     </div>
@@ -94,6 +96,8 @@
     initNav();
     let giangVienChon = null;
     let danhMucNoiDung = [];
+    let danhMucNoiDungMap = {};
+    let phanCongChon = null;
 
     async function khoiTao() {
       const [donVis, namHocs, noiDungs] = await Promise.all([
@@ -104,12 +108,7 @@
       document.getElementById('donViChon').innerHTML = donVis.map(d => `<option value="${d.ID_DonVi}">${d.Ten_DonVi}</option>`).join('');
       document.getElementById('namHocChon').innerHTML = namHocs.map(n => `<option value="${n.ID_NamHoc}">${n.Ten_NamHoc}</option>`).join('');
       danhMucNoiDung = noiDungs;
-      document.getElementById('bangGioDuKien').innerHTML = noiDungs.map(nd => `
-        <tr>
-          <td>${nd.Ten_NoiDung}</td>
-          <td><input type="number" min="0" id="dh_${nd.ID_NoiDung}" style="width:80px;" /></td>
-          <td><input type="number" min="0" id="sdh_${nd.ID_NoiDung}" style="width:80px;" /></td>
-        </tr>`).join('');
+      noiDungs.forEach(nd => { danhMucNoiDungMap[nd.ID_NoiDung] = nd.Ten_NoiDung; });
       document.getElementById('plLoaiNoiDung').innerHTML = noiDungs.map(nd => `<option value="${nd.ID_NoiDung}">${nd.Ten_NoiDung}</option>`).join('');
       taiDanhSachHopDong();
     }
@@ -123,14 +122,56 @@
           if (!gv) {
             document.getElementById('thongTinGV').innerHTML = '<span style="color:#b00020;">Chưa có hồ sơ — tạo hồ sơ ở trang Tra cứu / Lập danh sách trước.</span>';
             giangVienChon = null;
+            timPhanCong();
             return;
           }
           giangVienChon = gv;
           document.getElementById('thongTinGV').innerHTML = `Đã chọn: <strong>${gv.Ho_Ten}</strong> (${gv.Hoc_Ham_Hoc_Vi})`;
+          timPhanCong();
         } catch (err) {
           document.getElementById('loi').textContent = err.message;
         }
       });
+    }
+
+    /** Tự tra lại dòng danh sách + giờ dự kiến đơn vị đã nộp ngay khi đủ giảng viên + đơn vị + năm học. */
+    async function timPhanCong() {
+      const nutTao = document.getElementById('nutTaoHopDong');
+      phanCongChon = null;
+      nutTao.disabled = true;
+      baoThongDiep('thongDiepPhanCong', '', true);
+
+      if (!giangVienChon) {
+        document.getElementById('bangGioDuKien').innerHTML = '<tr><td colspan="3" style="color:#777;">Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.</td></tr>';
+        return;
+      }
+      const idDonVi = document.getElementById('donViChon').value;
+      const idNamHoc = document.getElementById('namHocChon').value;
+      if (!idDonVi || !idNamHoc) return;
+
+      try {
+        const ketQua = await callApi('timPhanCongTheoGiangVien', { idGiangVien: giangVienChon.ID_GiangVien, idDonVi, idNamHoc });
+        if (!ketQua || !ketQua.chiTietGio || !ketQua.chiTietGio.length) {
+          document.getElementById('bangGioDuKien').innerHTML = '<tr><td colspan="3" style="color:#777;">Chưa có dữ liệu.</td></tr>';
+          baoThongDiep('thongDiepPhanCong', 'Đơn vị chưa lập danh sách hoặc chưa nộp giờ giảng dự kiến cho giảng viên này trong năm học đã chọn — không thể lập hợp đồng.', false);
+          return;
+        }
+        phanCongChon = ketQua.phanCong;
+        const gomTheoNoiDung = {};
+        ketQua.chiTietGio.forEach(ct => {
+          if (!gomTheoNoiDung[ct.ID_NoiDung]) gomTheoNoiDung[ct.ID_NoiDung] = { DaiHoc: 0, SauDaiHoc: 0 };
+          gomTheoNoiDung[ct.ID_NoiDung][ct.Cap_Bac] = Number(ct.So_Gio);
+        });
+        document.getElementById('bangGioDuKien').innerHTML = Object.keys(gomTheoNoiDung).map(idNd => `
+          <tr>
+            <td>${danhMucNoiDungMap[idNd] || idNd}</td>
+            <td>${gomTheoNoiDung[idNd].DaiHoc || 0}</td>
+            <td>${gomTheoNoiDung[idNd].SauDaiHoc || 0}</td>
+          </tr>`).join('');
+        nutTao.disabled = false;
+      } catch (err) {
+        baoThongDiep('thongDiepPhanCong', err.message, false);
+      }
     }
 
     async function taoHopDong(btn) {
@@ -138,23 +179,16 @@
       loiEl.textContent = '';
       document.getElementById('thanhCong').textContent = '';
       if (!giangVienChon) { loiEl.textContent = 'Chưa chọn giảng viên hợp lệ'; return; }
-
-      const chiTietGioDuKien = [];
-      danhMucNoiDung.forEach(nd => {
-        const dh = Number(document.getElementById('dh_' + nd.ID_NoiDung).value || 0);
-        const sdh = Number(document.getElementById('sdh_' + nd.ID_NoiDung).value || 0);
-        if (dh > 0) chiTietGioDuKien.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'DaiHoc', So_Gio: dh });
-        if (sdh > 0) chiTietGioDuKien.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'SauDaiHoc', So_Gio: sdh });
-      });
+      if (!phanCongChon) { loiEl.textContent = 'Chưa có giờ giảng dự kiến đơn vị nộp cho giảng viên này — không thể lập hợp đồng'; return; }
 
       const hopDong = {
         ID_GiangVien: giangVienChon.ID_GiangVien,
         ID_DonVi: document.getElementById('donViChon').value,
         ID_NamHoc: document.getElementById('namHocChon').value,
+        ID_PhanCong: phanCongChon.ID_PhanCong,
         Noi_Dung_Giang_Day: document.getElementById('noiDungGiangDay').value,
         Tu_Ngay: document.getElementById('tuNgay').value,
         Den_Ngay: document.getElementById('denNgay').value,
-        chiTietGioDuKien: chiTietGioDuKien,
       };
 
       await chayVoiNutBan(btn, 'Đang lập hợp đồng...', async () => {
@@ -162,6 +196,12 @@
           const result = await callApi('taoHopDong', { hopDong });
           document.getElementById('thanhCong').textContent =
             `Đã tạo hợp đồng ${result.hopDong.Ma_So_HopDong} kèm Quyết định ${result.quyetDinh.Ma_So_QuyetDinh} (trạng thái: Dự thảo).`;
+          giangVienChon = null;
+          phanCongChon = null;
+          document.getElementById('thongTinGV').innerHTML = '';
+          document.getElementById('cccd').value = '';
+          document.getElementById('bangGioDuKien').innerHTML = '<tr><td colspan="3" style="color:#777;">Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.</td></tr>';
+          document.getElementById('nutTaoHopDong').disabled = true;
           taiDanhSachHopDong();
         } catch (err) {
           loiEl.textContent = err.message;

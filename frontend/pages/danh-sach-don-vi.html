@@ -26,21 +26,48 @@
       <h2>Bước 4 — Danh sách giảng viên thỉnh giảng của đơn vị</h2>
       <label>Năm học</label>
       <select id="namHocChon" onchange="taiDanhSach()"></select>
-      <button class="secondary" onclick="xuatExcel(this)">Xuất Excel</button>
       <table id="bangDanhSach">
         <thead>
-          <tr><th>Họ tên</th><th>CCCD</th><th>Học hàm/học vị</th><th>Môn học/học phần</th><th>Học kỳ</th><th>Số tiết/giờ</th><th>Trạng thái</th></tr>
+          <tr><th>Họ tên</th><th>CCCD</th><th>Học hàm/học vị</th><th>Môn học/học phần</th><th>Học kỳ</th><th>Số tiết/giờ</th><th>Giờ dự kiến đã nộp</th><th>Trạng thái</th></tr>
         </thead>
         <tbody id="thanDanhSach"></tbody>
       </table>
       <div id="loi" class="error"></div>
     </div>
+
+    <div class="card">
+      <h2>Bước 5 — Nộp giờ giảng dự kiến cho Admin (theo loại nội dung)</h2>
+      <p style="font-size:13px; color:#555;">
+        Admin lập hợp đồng dựa đúng theo số giờ đơn vị nộp ở đây — Admin không tự nhập số giờ.
+        Quy trình: (1) Xuất mẫu Excel → (2) điền số giờ dự kiến theo từng loại nội dung/cấp bậc cho từng giảng viên trong danh sách trên →
+        (3) Nhập file đã điền trở lại hệ thống. Nhập lại nhiều lần vẫn an toàn (lần sau ghi đè lần trước).
+      </p>
+      <button onclick="xuatMauExcel(this)">1. Xuất mẫu Excel</button>
+      <br />
+      <label>2-3. Chọn file Excel đã điền rồi nhập lại</label>
+      <input id="fileNhapGio" type="file" accept=".xlsx,.xls" />
+      <button onclick="nhapTuExcel(this)">Nhập giờ giảng từ Excel</button>
+      <div id="thongDiepExcel" style="margin-top:8px;"></div>
+    </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="../assets/js/api.js"></script>
   <script>
     requireRole('DonVi');
     initNav();
+
+    let danhMucNoiDung = [];
+    let danhSachHienTai = [];
+
+    // Phải khớp CHÍNH XÁC giữa lúc xuất và lúc nhập (dò theo tiêu đề cột, không theo vị trí cột).
+    function tieuDeCotDaiHoc(nd) { return nd.Ten_NoiDung + ' - Đại học'; }
+    function tieuDeCotSauDaiHoc(nd) { return nd.Ten_NoiDung + ' - Sau đại học'; }
+
+    async function khoiTaoTrang() {
+      danhMucNoiDung = await callApi('danhMucNoiDungGiangDay', {});
+      napNamHoc();
+    }
 
     async function napNamHoc() {
       const list = await callApi('danhSachNamHoc', {});
@@ -52,8 +79,8 @@
     async function taiDanhSach() {
       const idNamHoc = document.getElementById('namHocChon').value;
       try {
-        const ds = await callApi('layDanhSachDonVi', { idDonVi: localStorage.getItem('idDonVi'), idNamHoc });
-        document.getElementById('thanDanhSach').innerHTML = ds.map(r => `
+        danhSachHienTai = await callApi('layDanhSachDonVi', { idDonVi: localStorage.getItem('idDonVi'), idNamHoc });
+        document.getElementById('thanDanhSach').innerHTML = danhSachHienTai.map(r => `
           <tr>
             <td>${r.Ho_Ten_GiangVien || ''}</td>
             <td>${r.So_CCCD || ''}</td>
@@ -61,6 +88,7 @@
             <td>${r.Mon_Hoc_HocPhan || ''}</td>
             <td>${r.Hoc_Ky || ''}</td>
             <td>${r.So_Tiet_So_Gio || ''}</td>
+            <td>${(r.ChiTietGio && r.ChiTietGio.length) ? 'Đã nộp (' + r.ChiTietGio.length + ' dòng)' : '<span style="color:#b00020;">Chưa nộp</span>'}</td>
             <td>${r.Trang_Thai || ''}</td>
           </tr>`).join('');
       } catch (err) {
@@ -68,19 +96,81 @@
       }
     }
 
-    async function xuatExcel(btn) {
-      await chayVoiNutBan(btn, 'Đang xuất...', async () => {
+    function xuatMauExcel(btn) {
+      if (!danhSachHienTai.length) { baoThongDiep('thongDiepExcel', 'Chưa có dòng danh sách nào để xuất mẫu.', false); return; }
+      chayVoiNutBan(btn, 'Đang xuất...', async () => {
+        const header = ['ID_PhanCong (không sửa cột này)', 'Họ tên', 'CCCD', 'Môn học/học phần', 'Học kỳ'];
+        danhMucNoiDung.forEach(nd => { header.push(tieuDeCotDaiHoc(nd), tieuDeCotSauDaiHoc(nd)); });
+
+        const rows = [header];
+        danhSachHienTai.forEach(r => {
+          const gioMap = {};
+          (r.ChiTietGio || []).forEach(ct => { gioMap[ct.ID_NoiDung + '|' + ct.Cap_Bac] = ct.So_Gio; });
+          const row = [r.ID_PhanCong, r.Ho_Ten_GiangVien || '', r.So_CCCD || '', r.Mon_Hoc_HocPhan || '', r.Hoc_Ky || ''];
+          danhMucNoiDung.forEach(nd => {
+            row.push(gioMap[nd.ID_NoiDung + '|DaiHoc'] || '', gioMap[nd.ID_NoiDung + '|SauDaiHoc'] || '');
+          });
+          rows.push(row);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'GioDuKien');
+        XLSX.writeFile(wb, 'Mau_GioGiangDuKien_' + document.getElementById('namHocChon').value + '.xlsx');
+        baoThongDiep('thongDiepExcel', 'Đã tải file mẫu — điền số giờ rồi nhập lại ở khung bên dưới.', true);
+      });
+    }
+
+    async function nhapTuExcel(btn) {
+      const fileEl = document.getElementById('fileNhapGio');
+      const file = fileEl.files[0];
+      if (!file) { baoThongDiep('thongDiepExcel', 'Chưa chọn file', false); return; }
+
+      await chayVoiNutBan(btn, 'Đang đọc file...', async () => {
         try {
-          const idNamHoc = document.getElementById('namHocChon').value;
-          const result = await callApi('xuatDanhSachExcel', { idDonVi: localStorage.getItem('idDonVi'), idNamHoc });
-          window.open(result.url, '_blank');
+          const buf = await file.arrayBuffer();
+          const wb = XLSX.read(buf, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          if (!aoa.length) throw new Error('File rỗng');
+
+          const header = aoa[0].map(h => String(h).trim());
+          const idxPhanCong = header.findIndex(h => h.indexOf('ID_PhanCong') === 0);
+          if (idxPhanCong === -1) throw new Error('File không đúng mẫu (thiếu cột ID_PhanCong) — hãy xuất mẫu mới nhất rồi điền lại');
+
+          const cotTheoNoiDung = danhMucNoiDung.map(nd => ({
+            nd,
+            idxDH: header.indexOf(tieuDeCotDaiHoc(nd)),
+            idxSDH: header.indexOf(tieuDeCotSauDaiHoc(nd)),
+          }));
+
+          const danhSach = [];
+          for (let r = 1; r < aoa.length; r++) {
+            const row = aoa[r];
+            const idPhanCong = row[idxPhanCong];
+            if (!idPhanCong) continue;
+            const chiTiet = [];
+            cotTheoNoiDung.forEach(c => {
+              const soGioDH = Number(row[c.idxDH] || 0);
+              const soGioSDH = Number(row[c.idxSDH] || 0);
+              if (soGioDH > 0) chiTiet.push({ ID_NoiDung: c.nd.ID_NoiDung, Cap_Bac: 'DaiHoc', So_Gio: soGioDH });
+              if (soGioSDH > 0) chiTiet.push({ ID_NoiDung: c.nd.ID_NoiDung, Cap_Bac: 'SauDaiHoc', So_Gio: soGioSDH });
+            });
+            danhSach.push({ ID_PhanCong: idPhanCong, chiTiet });
+          }
+          if (!danhSach.length) throw new Error('Không đọc được dòng dữ liệu nào trong file');
+
+          const ketQua = await callApi('nhapGioDuKienTuExcel', { danhSach });
+          baoThongDiep('thongDiepExcel', `Đã nhập giờ giảng cho ${ketQua.soDongDaXuLy} dòng.`, true);
+          fileEl.value = '';
+          taiDanhSach();
         } catch (err) {
-          document.getElementById('loi').textContent = err.message;
+          baoThongDiep('thongDiepExcel', err.message, false);
         }
       });
     }
 
-    napNamHoc();
+    khoiTaoTrang();
   </script>
 </body>
 </html>

@@ -45,6 +45,8 @@ var ACTION_MAP = {
   themVaoDanhSach: api_themVaoDanhSach,
   layDanhSachDonVi: api_layDanhSachDonVi,
   xuatDanhSachExcel: api_xuatDanhSachExcel,
+  nhapGioDuKienTuExcel: api_nhapGioDuKienTuExcel,
+  timPhanCongTheoGiangVien: api_timPhanCongTheoGiangVien,
 
   // Hợp đồng + Quyết định
   taoHopDong: api_taoHopDong,

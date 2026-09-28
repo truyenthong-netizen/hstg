@@ -53,6 +53,7 @@ button {
 }
 button.secondary { background: #6c7a89; }
 button:hover { opacity: 0.9; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
 table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
 th, td { border: 1px solid var(--border); padding: 8px; text-align: left; }
 th { background: #eef1f5; }

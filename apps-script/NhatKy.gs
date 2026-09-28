@@ -25,5 +25,5 @@ function api_layNhatKy(payload) {
            (!payload.idDoiTuong || r.ID_DoiTuong === payload.idDoiTuong);
   });
   filtered.sort(function (a, b) { return new Date(b.Thoi_Gian) - new Date(a.Thoi_Gian); });
-  return filtered;
+  return okResponse_(filtered);
 }

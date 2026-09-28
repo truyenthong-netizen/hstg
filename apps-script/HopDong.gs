@@ -26,13 +26,17 @@ function sinhMaSoQuyetDinh_(idNamHoc, tenNamHoc) {
 
 /**
  * Bước 5: Admin lập hợp đồng. Đồng thời sinh Quyết định 1-1 (đã xác nhận với đơn vị).
- * payload.hopDong: { ID_NamHoc, ID_DonVi, ID_GiangVien, ID_PhanCong, Noi_Dung_Giang_Day,
- *                     Tu_Ngay, Den_Ngay, chiTietGioDuKien: [{ID_NoiDung, Cap_Bac, So_Gio}] }
+ * payload.hopDong: { ID_NamHoc, ID_DonVi, ID_GiangVien, ID_PhanCong, Noi_Dung_Giang_Day, Tu_Ngay, Den_Ngay }
+ *
+ * QUAN TRỌNG: số giờ dự kiến theo loại nội dung KHÔNG do Admin tự nhập. Đơn vị là nơi duy nhất
+ * lập danh sách + nộp giờ dự kiến (qua Excel — xem api_nhapGioDuKienTuExcel trong PhanCong.gs).
+ * Ở đây chỉ ĐỌC LẠI đúng số đơn vị đã nộp theo ID_PhanCong, không nhận số từ client gửi lên,
+ * để tránh Admin (hoặc ai đó sửa request) tự ý đổi số giờ ngoài ý muốn đơn vị.
  */
 function api_taoHopDong(payload) {
   var session = yeuCauAdmin_(payload.token);
   var d = payload.hopDong || {};
-  var required = ['ID_NamHoc', 'ID_DonVi', 'ID_GiangVien'];
+  var required = ['ID_NamHoc', 'ID_DonVi', 'ID_GiangVien', 'ID_PhanCong'];
   for (var i = 0; i < required.length; i++) {
     if (!d[required[i]]) return errorResponse_('Thiếu trường: ' + required[i], 'INVALID_INPUT');
   }
@@ -41,6 +45,16 @@ function api_taoHopDong(payload) {
   if (!giangVien) return errorResponse_('Không tìm thấy giảng viên', 'NOT_FOUND');
   var namHoc = sheetToObjects_(SHEETS.NAM_HOC).filter(function (nh) { return nh.ID_NamHoc === d.ID_NamHoc; })[0];
   if (!namHoc) return errorResponse_('Không tìm thấy năm học', 'NOT_FOUND');
+
+  var phanCong = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (pc) { return pc.ID_PhanCong === d.ID_PhanCong; })[0];
+  if (!phanCong) return errorResponse_('Không tìm thấy dòng danh sách của đơn vị', 'NOT_FOUND');
+  if (phanCong.ID_GiangVien !== d.ID_GiangVien || phanCong.ID_DonVi !== d.ID_DonVi || phanCong.ID_NamHoc !== d.ID_NamHoc) {
+    return errorResponse_('Dòng danh sách không khớp giảng viên/đơn vị/năm học đã chọn', 'MISMATCH');
+  }
+  var chiTietGioDuKien = layChiTietTheoThamChieu_('PhanCong', d.ID_PhanCong);
+  if (!chiTietGioDuKien.length) {
+    return errorResponse_('Đơn vị chưa nộp giờ giảng dự kiến cho giảng viên này — vào trang Danh sách đơn vị, dùng "Nhập giờ giảng từ Excel" trước khi lập hợp đồng', 'MISSING_GIO_DU_KIEN');
+  }
 
   return withLock_(function () {
     var idHopDong = newId_('HD');
@@ -79,8 +93,9 @@ function api_taoHopDong(payload) {
     };
     appendRow_(SHEETS.QUYET_DINH_HOP_DONG, quyetDinh);
 
-    // Ghi giờ dự kiến (Nguon = HopDong) vào CHI_TIET_GIO_GIANG, nếu có gửi kèm.
-    (d.chiTietGioDuKien || []).forEach(function (ct) {
+    // Sao chép giờ dự kiến đơn vị đã nộp (Nguon = PhanCong) thành Nguon = HopDong,
+    // gắn cố định vào hợp đồng này tại thời điểm lập (không đổi theo nếu đơn vị nhập lại Excel sau này).
+    chiTietGioDuKien.forEach(function (ct) {
       ghiChiTietGio_('HopDong', idHopDong, ct.ID_NoiDung, ct.Cap_Bac, ct.So_Gio);
     });
 
