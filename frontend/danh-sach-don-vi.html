@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Danh sách giảng viên thỉnh giảng của đơn vị</title>
+<link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <strong>QL Giảng viên thỉnh giảng</strong>
+    <nav>
+      <a href="tra-cuu-giang-vien.html" data-role="DonVi">Tra cứu / Lập danh sách</a>
+      <a href="danh-sach-don-vi.html" data-role="DonVi">Danh sách đơn vị</a>
+      <a href="thanh-ly.html" data-role="DonVi">Thanh lý</a>
+      <a href="hop-dong.html" data-role="Admin">Hợp đồng</a>
+      <a href="danh-muc.html" data-role="Admin">Danh mục</a>
+      <a href="nguoi-dung.html" data-role="Admin">Người dùng</a>
+      <span id="hoTenHienTai" style="margin-right:12px; font-size:13px; opacity:0.85;"></span>
+      <a href="#" onclick="clearSession(); window.location.href='../index.html';">Đăng xuất</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Bước 4 — Danh sách giảng viên thỉnh giảng của đơn vị</h2>
+      <p style="font-size:13px; color:#555;">
+        Chọn năm học để xem danh sách, sau đó bấm <strong>Nhập giờ</strong> ở từng dòng để điền số giờ chuẩn quy đổi cho giảng viên đó.
+        Số giờ nhập ở đây được gửi thẳng cho Admin dùng khi lập hợp đồng — không cần thao tác gửi riêng.
+        Khi danh sách đã hoàn thiện, bấm <strong>Xuất danh sách trình ký</strong> để lấy file in ký duyệt.
+      </p>
+      <label>Năm học</label>
+      <select id="namHocChon" onchange="taiDanhSach()"></select>
+      <button class="secondary" onclick="xuatDanhSachTrinhKy(this)">Xuất danh sách trình ký</button>
+      <div id="thongDiepXuat" style="margin:8px 0;"></div>
+      <table id="bangDanhSach">
+        <thead>
+          <tr><th>Họ tên</th><th>CCCD</th><th>Học hàm/học vị</th><th>Môn học/học phần</th><th>Học kỳ</th><th>Giờ chuẩn quy đổi</th><th>Trạng thái</th><th>Thao tác</th></tr>
+        </thead>
+        <tbody id="thanDanhSach"></tbody>
+      </table>
+      <div id="loi" class="error"></div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="../assets/js/api.js"></script>
+  <script>
+    requireRole('DonVi');
+    initNav();
+
+    let danhSachHienTai = [];
+    let idPhanCongDangSua = null;
+
+    async function napNamHoc() {
+      const list = await callApi('danhSachNamHoc', {});
+      const sel = document.getElementById('namHocChon');
+      sel.innerHTML = list.map(nh => `<option value="${nh.ID_NamHoc}">${nh.Ten_NamHoc}</option>`).join('');
+      taiDanhSach();
+    }
+
+    function tongGio(chiTietGio) {
+      const m = {};
+      (chiTietGio || []).forEach(ct => { m[ct.Cap_Bac] = Number(ct.So_Gio); });
+      const dh = m.DaiHoc || 0, sdh = m.SauDaiHoc || 0, nckh = m.NCKH || 0;
+      return { dh, sdh, nckh, tong: dh + sdh + nckh };
+    }
+
+    async function taiDanhSach() {
+      const idNamHoc = document.getElementById('namHocChon').value;
+      try {
+        danhSachHienTai = await callApi('layDanhSachDonVi', { idDonVi: localStorage.getItem('idDonVi'), idNamHoc });
+        ve();
+      } catch (err) {
+        document.getElementById('loi').textContent = err.message;
+      }
+    }
+
+    /** Tổng giờ chuẩn quy đổi giảng viên này đã có ở CÁC DÒNG KHÁC (cùng năm học, cùng đơn vị),
+     * dùng để người nhập rà soát trước khi lưu thêm — tránh cộng dồn vượt quy định mà không hay. */
+    function tongGioCacDongKhac(idGiangVien, idPhanCongTru) {
+      return danhSachHienTai
+        .filter(r => r.ID_GiangVien === idGiangVien && r.ID_PhanCong !== idPhanCongTru)
+        .reduce((acc, r) => {
+          const g = tongGio(r.ChiTietGio);
+          acc.dh += g.dh; acc.sdh += g.sdh; acc.nckh += g.nckh; acc.tong += g.tong;
+          acc.monHoc.push(`${r.Mon_Hoc_HocPhan || '(chưa rõ môn)'}: ${g.tong} giờ`);
+          return acc;
+        }, { dh: 0, sdh: 0, nckh: 0, tong: 0, monHoc: [] });
+    }
+
+    /** Cập nhật dòng tổng xem trước khi người dùng gõ số vào 3 ô giờ. */
+    function capNhatTongXemTruoc(idPhanCong, tongCacDongKhac) {
+      const dh = Number(document.getElementById('gdh_' + idPhanCong).value || 0);
+      const sdh = Number(document.getElementById('gsdh_' + idPhanCong).value || 0);
+      const nckh = Number(document.getElementById('gnckh_' + idPhanCong).value || 0);
+      const tongDongNay = dh + sdh + nckh;
+      const el = document.getElementById('tongXemTruoc_' + idPhanCong);
+      if (el) el.textContent = `Nếu lưu dòng này: ${tongDongNay} + ${tongCacDongKhac} (các môn khác) = ${tongDongNay + tongCacDongKhac} giờ.`;
+    }
+
+    function ve() {
+      document.getElementById('thanDanhSach').innerHTML = danhSachHienTai.map(r => {
+        const g = tongGio(r.ChiTietGio);
+        if (r.ID_PhanCong === idPhanCongDangSua) {
+          const dongKhac = tongGioCacDongKhac(r.ID_GiangVien, r.ID_PhanCong);
+          const ghiChuDongKhac = dongKhac.monHoc.length
+            ? `Giờ dự kiến giảng viên này đã có ở môn khác trong năm học (${r.Mon_Hoc_HocPhan || ''} không tính):<br>` +
+              dongKhac.monHoc.map(s => '- ' + s).join('<br>') +
+              `<br><strong>Cộng các môn khác: ${dongKhac.tong} giờ.</strong>`
+            : 'Giảng viên này chưa có dòng nào khác trong năm học — đây là môn đầu tiên.';
+          return `
+          <tr>
+            <td colspan="8">
+              <strong>${r.Ho_Ten_GiangVien || ''}</strong> (${r.So_CCCD || ''}) — ${r.Mon_Hoc_HocPhan || ''}
+              <div style="background:#fff8e1; border:1px solid #f0d675; border-radius:6px; padding:8px; margin:8px 0; font-size:13px;">
+                ${ghiChuDongKhac}
+              </div>
+              <table style="margin-top:8px;">
+                <tr>
+                  <td style="width:33%;">Giờ chuẩn giảng dạy Đại học</td>
+                  <td style="width:33%;">Giờ chuẩn giảng dạy Sau đại học</td>
+                  <td style="width:33%;">Giờ chuẩn Nghiên cứu khoa học</td>
+                </tr>
+                <tr>
+                  <td><input id="gdh_${r.ID_PhanCong}" type="number" min="0" value="${g.dh}" oninput="capNhatTongXemTruoc('${r.ID_PhanCong}', ${dongKhac.tong})" /></td>
+                  <td><input id="gsdh_${r.ID_PhanCong}" type="number" min="0" value="${g.sdh}" oninput="capNhatTongXemTruoc('${r.ID_PhanCong}', ${dongKhac.tong})" /></td>
+                  <td><input id="gnckh_${r.ID_PhanCong}" type="number" min="0" value="${g.nckh}" oninput="capNhatTongXemTruoc('${r.ID_PhanCong}', ${dongKhac.tong})" /></td>
+                </tr>
+              </table>
+              <div id="tongXemTruoc_${r.ID_PhanCong}" style="margin-top:6px; font-size:13px; color:#555;">
+                Nếu lưu dòng này: ${g.tong} + ${dongKhac.tong} (các môn khác) = ${g.tong + dongKhac.tong} giờ.
+              </div>
+              <div style="margin-top:8px;">
+                <button onclick="luuGio(this, '${r.ID_PhanCong}')">Lưu</button>
+                <button class="secondary" onclick="huySua()">Huỷ</button>
+              </div>
+            </td>
+          </tr>`;
+        }
+        return `
+        <tr>
+          <td>${r.Ho_Ten_GiangVien || ''}</td>
+          <td>${r.So_CCCD || ''}</td>
+          <td>${r.Hoc_Ham_Hoc_Vi || ''}</td>
+          <td>${r.Mon_Hoc_HocPhan || ''}</td>
+          <td>${r.Hoc_Ky || ''}</td>
+          <td>${g.tong > 0 ? 'Tổng ' + g.tong + ' giờ (ĐH ' + g.dh + ' / SĐH ' + g.sdh + ' / NCKH ' + g.nckh + ')' : '<span style="color:#b00020;">Chưa nhập</span>'}</td>
+          <td>${r.Trang_Thai || ''}</td>
+          <td><button class="secondary" onclick="batDauSua('${r.ID_PhanCong}')">Nhập giờ</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function batDauSua(idPhanCong) { idPhanCongDangSua = idPhanCong; ve(); }
+    function huySua() { idPhanCongDangSua = null; ve(); }
+
+    async function luuGio(btn, idPhanCong) {
+      const gioChuanDaiHoc = document.getElementById('gdh_' + idPhanCong).value;
+      const gioChuanSauDaiHoc = document.getElementById('gsdh_' + idPhanCong).value;
+      const gioChuanNCKH = document.getElementById('gnckh_' + idPhanCong).value;
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('capNhatGioDuKien', { idPhanCong, gioChuanDaiHoc, gioChuanSauDaiHoc, gioChuanNCKH });
+          idPhanCongDangSua = null;
+          baoThongDiep('loi', 'Đã lưu giờ giảng — Admin có thể dùng ngay để lập hợp đồng.', true);
+          await taiDanhSach();
+        } catch (err) {
+          document.getElementById('loi').textContent = err.message;
+        }
+      });
+    }
+
+    function xuatDanhSachTrinhKy(btn) {
+      if (!danhSachHienTai.length) { baoThongDiep('thongDiepXuat', 'Chưa có dòng danh sách nào để xuất.', false); return; }
+      chayVoiNutBan(btn, 'Đang xuất...', async () => {
+        const rows = [['Họ tên', 'CCCD', 'Học hàm/học vị', 'Môn học/học phần', 'Học kỳ',
+          'Giờ chuẩn giảng dạy Đại học', 'Giờ chuẩn giảng dạy Sau đại học', 'Giờ chuẩn Nghiên cứu khoa học', 'Tổng số giờ chuẩn quy đổi']];
+        danhSachHienTai.forEach(r => {
+          const g = tongGio(r.ChiTietGio);
+          rows.push([r.Ho_Ten_GiangVien || '', r.So_CCCD || '', r.Hoc_Ham_Hoc_Vi || '', r.Mon_Hoc_HocPhan || '', r.Hoc_Ky || '', g.dh, g.sdh, g.nckh, g.tong]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'DanhSachTrinhKy');
+        XLSX.writeFile(wb, 'DanhSachTrinhKy_' + document.getElementById('namHocChon').value + '.xlsx');
+        baoThongDiep('thongDiepXuat', 'Đã tải file danh sách trình ký.', true);
+      });
+    }
+
+    napNamHoc();
+  </script>
+</body>
+</html>
