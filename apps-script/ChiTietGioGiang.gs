@@ -1,21 +1,23 @@
 /**
- * ChiTietGioGiang.gs — Mục 9.7 tài liệu YCNV.
- * Dùng chung 1 bảng cho cả giờ dự kiến (Nguon='HopDong') và giờ thực tế (Nguon='GCN'),
- * theo đúng cấu trúc ma trận 2 hàng (Đại học/Sau đại học) × 6 loại nội dung
- * trong mẫu Giấy xác nhận giờ giảng / Thanh lý hợp đồng thực tế.
+ * ChiTietGioGiang.gs.
+ * Dùng chung 1 bảng cho cả giờ dự kiến (Nguon='PhanCong' rồi 'HopDong') và giờ thực tế (Nguon='GCN'),
+ * theo đúng mẫu thực tế đơn vị nộp: "Tổng số giờ chuẩn quy đổi, trong đó: Đại học / Sau đại học /
+ * Nghiên cứu khoa học" — KHÔNG còn chia nhỏ theo 6 loại nội dung giảng dạy như bản trước.
+ * Cap_Bac giờ mang 1 trong 3 giá trị: 'DaiHoc' | 'SauDaiHoc' | 'NCKH'.
+ * Đơn vị nhập trực tiếp SỐ GIỜ CHUẨN đã quy đổi (không cần hệ số quy đổi nữa),
+ * nên So_Gio_Chuan luôn bằng So_Gio. Cột ID_NoiDung giữ lại trong schema cho tương thích
+ * ngược nhưng không còn dùng (luôn để trống).
  */
 
-function ghiChiTietGio_(nguon, idThamChieu, idNoiDung, capBac, soGio) {
-  var dmNoiDung = sheetToObjects_(SHEETS.DM_NOI_DUNG_GIANG_DAY).filter(function (nd) { return nd.ID_NoiDung === idNoiDung; })[0];
-  var heSo = dmNoiDung ? Number(dmNoiDung.He_So_Quy_Doi_Mac_Dinh || 1) : 1;
+function ghiChiTietGio_(nguon, idThamChieu, capBac, soGio) {
   var record = {
     ID_ChiTiet: newId_('CT'),
     Nguon: nguon,
     ID_ThamChieu: idThamChieu,
-    ID_NoiDung: idNoiDung,
+    ID_NoiDung: '',
     Cap_Bac: capBac,
     So_Gio: Number(soGio) || 0,
-    So_Gio_Chuan: (Number(soGio) || 0) * heSo,
+    So_Gio_Chuan: Number(soGio) || 0,
   };
   appendRow_(SHEETS.CHI_TIET_GIO_GIANG, record);
   return record;

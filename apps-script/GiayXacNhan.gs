@@ -14,7 +14,7 @@ function sinhMaSoGCN_() {
 
 /**
  * payload.gcn: { ID_HopDong, Thoi_Gian_Tu_Den, Nguoi_Xac_Nhan, Chuc_Vu_Nguoi_Xac_Nhan, File_DinhKem_Url,
- *                chiTietGioThucTe: [{ID_NoiDung, Cap_Bac, So_Gio}] }
+ *                chiTietGioThucTe: [{Cap_Bac, So_Gio}] }  (Cap_Bac: 'DaiHoc'|'SauDaiHoc'|'NCKH')
  */
 function api_taoGiayXacNhan(payload) {
   var session = yeuCauDangNhap_(payload.token);
@@ -42,7 +42,7 @@ function api_taoGiayXacNhan(payload) {
     appendRow_(SHEETS.GIAY_XAC_NHAN_GIO_GIANG, record);
 
     (d.chiTietGioThucTe || []).forEach(function (ct) {
-      ghiChiTietGio_('GCN', idGCN, ct.ID_NoiDung, ct.Cap_Bac, ct.So_Gio);
+      ghiChiTietGio_('GCN', idGCN, ct.Cap_Bac, ct.So_Gio);
     });
 
     ghiNhatKy_('GIAY_XAC_NHAN_GIO_GIANG', idGCN, 'Tao_Moi', null, record, session.tenDangNhap);

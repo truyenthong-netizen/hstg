@@ -94,9 +94,9 @@ function api_taoHopDong(payload) {
     appendRow_(SHEETS.QUYET_DINH_HOP_DONG, quyetDinh);
 
     // Sao chép giờ dự kiến đơn vị đã nộp (Nguon = PhanCong) thành Nguon = HopDong,
-    // gắn cố định vào hợp đồng này tại thời điểm lập (không đổi theo nếu đơn vị nhập lại Excel sau này).
+    // gắn cố định vào hợp đồng này tại thời điểm lập (không đổi theo nếu đơn vị sửa lại sau này).
     chiTietGioDuKien.forEach(function (ct) {
-      ghiChiTietGio_('HopDong', idHopDong, ct.ID_NoiDung, ct.Cap_Bac, ct.So_Gio);
+      ghiChiTietGio_('HopDong', idHopDong, ct.Cap_Bac, ct.So_Gio);
     });
 
     ghiNhatKy_('HOP_DONG', idHopDong, 'Tao_Moi', null, hopDong, session.tenDangNhap);

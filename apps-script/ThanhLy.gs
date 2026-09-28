@@ -1,9 +1,9 @@
 /**
  * ThanhLy.gs — Bước 8, 9, 10, 11 tài liệu YCNV. Đây là phần kiểm soát chặt nhất hệ thống:
- * - Số giờ thực tế (GCN) theo từng (loại nội dung, cấp bậc) KHÔNG được vượt số giờ
- *   dự kiến trong hợp đồng gốc CỘNG với phần tăng thêm từ phụ lục (nếu có) — xem
- *   ghi chú trong PhuLuc.gs: phụ lục ghi thêm dòng CHI_TIET_GIO_GIANG (Nguon='HopDong'),
- *   nên hàm gomTheoLoaiVaCapBac_ dưới đây tự động cộng dồn đúng mà không cần xử lý riêng.
+ * - Số giờ thực tế (GCN) theo từng mục (Đại học / Sau đại học / Nghiên cứu khoa học) KHÔNG
+ *   được vượt số giờ dự kiến trong hợp đồng gốc CỘNG với phần tăng thêm từ phụ lục (nếu có) —
+ *   xem ghi chú trong PhuLuc.gs: phụ lục ghi thêm dòng CHI_TIET_GIO_GIANG (Nguon='HopDong'),
+ *   nên hàm gomTheoCapBac_ dưới đây tự động cộng dồn đúng mà không cần xử lý riêng.
  * - Mỗi hợp đồng chỉ thanh lý đúng 1 lần (ràng buộc UNIQUE ID_HopDong ở THANH_LY_HOP_DONG,
  *   tự kiểm tra vì Sheets không có UNIQUE thật).
  * - Thù lao = Tổng giờ chuẩn thực tế × Định mức theo học hàm/học vị của giảng viên (Mục 9.9).
@@ -15,30 +15,28 @@ function sinhMaSoBienBan_() {
   return stt + '/ĐHYD-TLHĐ';
 }
 
-/** Gom chi tiết giờ theo khoá "idNoiDung|capBac" -> tổng So_Gio_Chuan. */
-function gomTheoLoaiVaCapBac_(chiTietList) {
+/** Gom chi tiết giờ theo Cap_Bac ('DaiHoc'|'SauDaiHoc'|'NCKH') -> tổng So_Gio_Chuan. */
+function gomTheoCapBac_(chiTietList) {
   var map = {};
   chiTietList.forEach(function (ct) {
-    var key = ct.ID_NoiDung + '|' + ct.Cap_Bac;
-    map[key] = (map[key] || 0) + Number(ct.So_Gio_Chuan || 0);
+    map[ct.Cap_Bac] = (map[ct.Cap_Bac] || 0) + Number(ct.So_Gio_Chuan || 0);
   });
   return map;
 }
 
 /**
- * Bước 10: kiểm tra từng (loại nội dung, cấp bậc): giờ GCN <= giờ hợp đồng.
+ * Bước 10: kiểm tra từng mục (Đại học / Sau đại học / Nghiên cứu khoa học): giờ GCN <= giờ hợp đồng.
  * Trả về { hopLe: boolean, chiTietVuot: [...] }
  */
 function kiemTraDieuKienThanhLy_(idHopDong, idGCN) {
-  var gioHopDong = gomTheoLoaiVaCapBac_(layChiTietTheoThamChieu_('HopDong', idHopDong));
-  var gioGCN = gomTheoLoaiVaCapBac_(layChiTietTheoThamChieu_('GCN', idGCN));
+  var gioHopDong = gomTheoCapBac_(layChiTietTheoThamChieu_('HopDong', idHopDong));
+  var gioGCN = gomTheoCapBac_(layChiTietTheoThamChieu_('GCN', idGCN));
 
   var chiTietVuot = [];
-  Object.keys(gioGCN).forEach(function (key) {
-    var gioiHan = gioHopDong[key] || 0;
-    if (gioGCN[key] > gioiHan) {
-      var parts = key.split('|');
-      chiTietVuot.push({ idNoiDung: parts[0], capBac: parts[1], gioThucTe: gioGCN[key], gioHopDong: gioiHan });
+  Object.keys(gioGCN).forEach(function (capBac) {
+    var gioiHan = gioHopDong[capBac] || 0;
+    if (gioGCN[capBac] > gioiHan) {
+      chiTietVuot.push({ capBac: capBac, gioThucTe: gioGCN[capBac], gioHopDong: gioiHan });
     }
   });
   return { hopLe: chiTietVuot.length === 0, chiTietVuot: chiTietVuot };
@@ -67,8 +65,9 @@ function api_thanhLyHopDong(payload) {
     var kiemTra = kiemTraDieuKienThanhLy_(payload.idHopDong, payload.idGCN);
     if (!kiemTra.hopLe) {
       var vuot = kiemTra.chiTietVuot[0];
+      var tenMuc = { DaiHoc: 'Đại học', SauDaiHoc: 'Sau đại học', NCKH: 'Nghiên cứu khoa học' }[vuot.capBac] || vuot.capBac;
       return errorResponse_(
-        'Số giờ thực tế không được vượt quá số giờ theo hợp đồng (' + vuot.gioHopDong + ' giờ)',
+        'Số giờ thực tế mục "' + tenMuc + '" (' + vuot.gioThucTe + ' giờ) không được vượt quá số giờ theo hợp đồng (' + vuot.gioHopDong + ' giờ)',
         'VUOT_SO_GIO'
       );
     }

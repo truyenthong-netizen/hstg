@@ -6,10 +6,10 @@
 
 /**
  * payload.phuLuc: { ID_HopDong, Noi_Dung_Dieu_Chinh, GiaTri_Truoc, GiaTri_Sau, File_DinhKem_Url,
- *                    dieuChinhGio: { ID_NoiDung, Cap_Bac, So_Gio_Tang } }  (tuỳ chọn)
+ *                    dieuChinhGio: { Cap_Bac, So_Gio_Tang } }  (tuỳ chọn, Cap_Bac: 'DaiHoc'|'SauDaiHoc'|'NCKH')
  *
- * Nếu phụ lục làm TĂNG số giờ được phép cho 1 (loại nội dung, cấp bậc) cụ thể, truyền
- * kèm dieuChinhGio — hệ thống sẽ ghi thêm 1 dòng vào CHI_TIET_GIO_GIANG (Nguon='HopDong')
+ * Nếu phụ lục làm TĂNG số giờ chuẩn được phép cho 1 mục cụ thể (Đại học/Sau đại học/NCKH),
+ * truyền kèm dieuChinhGio — hệ thống sẽ ghi thêm 1 dòng vào CHI_TIET_GIO_GIANG (Nguon='HopDong')
  * với đúng số giờ tăng thêm. Vì kiemTraDieuKienThanhLy_ (ThanhLy.gs) CỘNG DỒN tất cả các
  * dòng Nguon='HopDong' của cùng hợp đồng, giới hạn thanh lý sẽ tự động được nới ra đúng
  * theo phụ lục mà không cần sửa lại dữ liệu gốc — đúng nguyên tắc "chỉ thêm, không ghi đè"
@@ -40,7 +40,7 @@ function api_taoPhuLuc(payload) {
     appendRow_(SHEETS.PHU_LUC_HOP_DONG, record);
 
     if (d.dieuChinhGio && d.dieuChinhGio.So_Gio_Tang) {
-      ghiChiTietGio_('HopDong', d.ID_HopDong, d.dieuChinhGio.ID_NoiDung, d.dieuChinhGio.Cap_Bac, d.dieuChinhGio.So_Gio_Tang);
+      ghiChiTietGio_('HopDong', d.ID_HopDong, d.dieuChinhGio.Cap_Bac, d.dieuChinhGio.So_Gio_Tang);
     }
 
     ghiNhatKy_('PHU_LUC_HOP_DONG', record.ID_PhuLuc, 'Tao_Moi', null, record, session.tenDangNhap);

@@ -56,10 +56,11 @@ function api_layDanhSachDonVi(payload) {
       Ho_Ten_GiangVien: gv.Ho_Ten,
       So_CCCD: gv.So_CCCD,
       Hoc_Ham_Hoc_Vi: gv.Hoc_Ham_Hoc_Vi,
-      // Giờ dự kiến theo loại nội dung × cấp bậc — nguồn DUY NHẤT là đơn vị nhập qua Excel
-      // (xem api_nhapGioDuKienTuExcel bên dưới). Admin KHÔNG tự nhập số này (xem HopDong.gs).
+      // Giờ chuẩn quy đổi dự kiến (Đại học / Sau đại học / Nghiên cứu khoa học) — nguồn DUY NHẤT
+      // là đơn vị tự nhập ngay trên danh sách này (xem api_capNhatGioDuKien bên dưới).
+      // Admin KHÔNG tự nhập số này khi lập hợp đồng (xem HopDong.gs).
       ChiTietGio: layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong).map(function (ct) {
-        return { ID_NoiDung: ct.ID_NoiDung, Cap_Bac: ct.Cap_Bac, So_Gio: ct.So_Gio };
+        return { Cap_Bac: ct.Cap_Bac, So_Gio: ct.So_Gio };
       }),
     });
   });
@@ -67,46 +68,40 @@ function api_layDanhSachDonVi(payload) {
 }
 
 /**
- * Đơn vị nhập giờ giảng dự kiến (theo loại nội dung × cấp bậc) từ file Excel đã xuất mẫu
- * (nút "Xuất Excel" ở trang Danh sách đơn vị), điền tay rồi nhập lại. Đây là NGUỒN DUY NHẤT
- * của "giờ dự kiến" dùng khi Admin lập hợp đồng — Admin không tự gõ số này (xem api_taoHopDong).
- * payload.danhSach: [{ ID_PhanCong, chiTiet: [{ ID_NoiDung, Cap_Bac, So_Gio }] }]
- * Ghi đè toàn bộ (xoá cũ, ghi lại từ đầu) cho mỗi ID_PhanCong có trong file — nhập lại nhiều lần vẫn an toàn.
+ * Đơn vị nhập/sửa giờ chuẩn quy đổi dự kiến cho 1 dòng danh sách — đúng theo mẫu
+ * "Tổng số giờ chuẩn quy đổi, trong đó: Đại học / Sau đại học / Nghiên cứu khoa học".
+ * Đây là NGUỒN DUY NHẤT của "giờ dự kiến" dùng khi Admin lập hợp đồng — Admin không tự
+ * gõ số này (xem api_taoHopDong trong HopDong.gs). Gọi lại nhiều lần cho cùng 1 dòng vẫn an
+ * toàn — ghi đè giá trị cũ (xoá 3 dòng chi tiết cũ, ghi lại từ đầu).
+ * payload: { idPhanCong, gioChuanDaiHoc, gioChuanSauDaiHoc, gioChuanNCKH }
  */
-function api_nhapGioDuKienTuExcel(payload) {
+function api_capNhatGioDuKien(payload) {
   var session = yeuCauDangNhap_(payload.token);
-  var danhSach = payload.danhSach || [];
-  if (!danhSach.length) return errorResponse_('Không có dòng dữ liệu nào để nhập', 'INVALID_INPUT');
-
-  var pcMap = {};
-  sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).forEach(function (pc) { pcMap[pc.ID_PhanCong] = pc; });
-
-  // Kiểm tra quyền cho toàn bộ file trước khi ghi bất kỳ dòng nào (tránh ghi dở dang).
-  for (var i = 0; i < danhSach.length; i++) {
-    var pc = pcMap[danhSach[i].ID_PhanCong];
-    if (!pc) return errorResponse_('File không khớp dữ liệu hệ thống (dòng ' + (i + 1) + ') — hãy xuất lại mẫu mới nhất rồi nhập lại', 'NOT_FOUND');
-    if (session.vaiTro === 'DonVi' && pc.ID_DonVi !== session.idDonVi) {
-      return errorResponse_('Không có quyền nhập giờ cho đơn vị khác (dòng ' + (i + 1) + ')', 'FORBIDDEN');
-    }
+  var pc = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (r) { return r.ID_PhanCong === payload.idPhanCong; })[0];
+  if (!pc) return errorResponse_('Không tìm thấy dòng danh sách', 'NOT_FOUND');
+  if (session.vaiTro === 'DonVi' && pc.ID_DonVi !== session.idDonVi) {
+    return errorResponse_('Không có quyền sửa giờ của đơn vị khác', 'FORBIDDEN');
   }
 
   return withLock_(function () {
-    danhSach.forEach(function (dong) {
-      var cuLai = sheetToObjects_(SHEETS.CHI_TIET_GIO_GIANG).filter(function (ct) {
-        return ct.Nguon === 'PhanCong' && ct.ID_ThamChieu === dong.ID_PhanCong;
-      });
-      cuLai.sort(function (a, b) { return b.__row - a.__row; }); // xoá từ dưới lên để không lệch số dòng
-      cuLai.forEach(function (ct) { deleteRow_(SHEETS.CHI_TIET_GIO_GIANG, ct.__row); });
+    var cuLai = sheetToObjects_(SHEETS.CHI_TIET_GIO_GIANG).filter(function (ct) {
+      return ct.Nguon === 'PhanCong' && ct.ID_ThamChieu === payload.idPhanCong;
+    });
+    cuLai.sort(function (a, b) { return b.__row - a.__row; }); // xoá từ dưới lên để không lệch số dòng
+    cuLai.forEach(function (ct) { deleteRow_(SHEETS.CHI_TIET_GIO_GIANG, ct.__row); });
 
-      (dong.chiTiet || []).forEach(function (ct) {
-        if (Number(ct.So_Gio) > 0) {
-          ghiChiTietGio_('PhanCong', dong.ID_PhanCong, ct.ID_NoiDung, ct.Cap_Bac, ct.So_Gio);
-        }
-      });
+    [
+      { capBac: 'DaiHoc', soGio: payload.gioChuanDaiHoc },
+      { capBac: 'SauDaiHoc', soGio: payload.gioChuanSauDaiHoc },
+      { capBac: 'NCKH', soGio: payload.gioChuanNCKH },
+    ].forEach(function (m) {
+      if (Number(m.soGio) > 0) ghiChiTietGio_('PhanCong', payload.idPhanCong, m.capBac, m.soGio);
     });
 
-    ghiNhatKy_('PHAN_CONG_THINH_GIANG', 'Nhap_Excel', 'Nhap_Gio_Du_Kien', null, { soDong: danhSach.length }, session.tenDangNhap);
-    return okResponse_({ soDongDaXuLy: danhSach.length });
+    ghiNhatKy_('PHAN_CONG_THINH_GIANG', payload.idPhanCong, 'Cap_Nhat_Gio_Du_Kien', null, {
+      gioChuanDaiHoc: payload.gioChuanDaiHoc, gioChuanSauDaiHoc: payload.gioChuanSauDaiHoc, gioChuanNCKH: payload.gioChuanNCKH,
+    }, session.tenDangNhap);
+    return okResponse_({});
   });
 }
 

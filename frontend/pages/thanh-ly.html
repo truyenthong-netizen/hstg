@@ -38,10 +38,9 @@
       <label>Chức vụ</label><input id="tlChucVu" />
       <label>Thời gian (VD: 9/2024 đến 7/2025)</label><input id="tlThoiGian" />
 
-      <table>
-        <thead><tr><th>Loại nội dung</th><th>Đại học</th><th>Sau đại học</th></tr></thead>
-        <tbody id="bangGioThucTe"></tbody>
-      </table>
+      <label>Giờ chuẩn giảng dạy Đại học</label><input id="gioDaiHoc" type="number" min="0" value="0" />
+      <label>Giờ chuẩn giảng dạy Sau đại học</label><input id="gioSauDaiHoc" type="number" min="0" value="0" />
+      <label>Giờ chuẩn Nghiên cứu khoa học</label><input id="gioNCKH" type="number" min="0" value="0" />
 
       <button onclick="thucHienThanhLy(this)">Bước 10-11 — Kiểm tra &amp; Thanh lý</button>
       <div id="loiThanhLy" class="error"></div>
@@ -53,11 +52,9 @@
   <script>
     requireRole('DonVi');
     initNav();
-    let danhMucNoiDung = [];
     let hopDongChon = null;
 
     async function khoiTao() {
-      danhMucNoiDung = await callApi('danhMucNoiDungGiangDay', {});
       taiDanhSachHopDong();
     }
 
@@ -75,12 +72,9 @@
     function chonHopDong(hd) {
       hopDongChon = hd;
       document.getElementById('tlMaSoHopDong').textContent = hd.Ma_So_HopDong;
-      document.getElementById('bangGioThucTe').innerHTML = danhMucNoiDung.map(nd => `
-        <tr>
-          <td>${nd.Ten_NoiDung}</td>
-          <td><input type="number" min="0" id="dh_${nd.ID_NoiDung}" style="width:80px;" /></td>
-          <td><input type="number" min="0" id="sdh_${nd.ID_NoiDung}" style="width:80px;" /></td>
-        </tr>`).join('');
+      document.getElementById('gioDaiHoc').value = 0;
+      document.getElementById('gioSauDaiHoc').value = 0;
+      document.getElementById('gioNCKH').value = 0;
       document.getElementById('cardThanhLy').style.display = 'block';
       document.getElementById('loiThanhLy').textContent = '';
       document.getElementById('ketQuaThanhLy').textContent = '';
@@ -91,12 +85,12 @@
       loiEl.textContent = '';
       document.getElementById('ketQuaThanhLy').textContent = '';
       const chiTietGioThucTe = [];
-      danhMucNoiDung.forEach(nd => {
-        const dh = Number(document.getElementById('dh_' + nd.ID_NoiDung).value || 0);
-        const sdh = Number(document.getElementById('sdh_' + nd.ID_NoiDung).value || 0);
-        if (dh > 0) chiTietGioThucTe.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'DaiHoc', So_Gio: dh });
-        if (sdh > 0) chiTietGioThucTe.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'SauDaiHoc', So_Gio: sdh });
-      });
+      const dh = Number(document.getElementById('gioDaiHoc').value || 0);
+      const sdh = Number(document.getElementById('gioSauDaiHoc').value || 0);
+      const nckh = Number(document.getElementById('gioNCKH').value || 0);
+      if (dh > 0) chiTietGioThucTe.push({ Cap_Bac: 'DaiHoc', So_Gio: dh });
+      if (sdh > 0) chiTietGioThucTe.push({ Cap_Bac: 'SauDaiHoc', So_Gio: sdh });
+      if (nckh > 0) chiTietGioThucTe.push({ Cap_Bac: 'NCKH', So_Gio: nckh });
 
       await chayVoiNutBan(btn, 'Đang xử lý...', async () => {
         try {

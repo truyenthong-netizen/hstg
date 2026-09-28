@@ -38,13 +38,12 @@
       <label>Từ ngày</label><input id="tuNgay" type="date" />
       <label>Đến ngày</label><input id="denNgay" type="date" />
 
-      <h3>Số giờ dự kiến theo loại nội dung</h3>
-      <p style="font-size:13px; color:#555;">Số giờ này do đơn vị nộp qua Excel (trang Danh sách đơn vị) — Admin không tự nhập, chỉ xem lại để xác nhận trước khi lập hợp đồng.</p>
+      <h3>Số giờ dự kiến</h3>
+      <p style="font-size:13px; color:#555;">Số giờ này do đơn vị đã nhập trực tiếp trên trang Danh sách đơn vị — Admin không tự nhập, chỉ xem lại để xác nhận trước khi lập hợp đồng.</p>
       <div id="thongDiepPhanCong" style="margin-bottom:8px;"></div>
-      <table>
-        <thead><tr><th>Loại nội dung</th><th>Đại học</th><th>Sau đại học</th></tr></thead>
-        <tbody id="bangGioDuKien"><tr><td colspan="3" style="color:#777;">Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.</td></tr></tbody>
-      </table>
+      <div id="tomTatGioDuKien" style="background:#f4f6f9; border:1px solid var(--border); border-radius:6px; padding:12px; font-size:14px;">
+        Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.
+      </div>
 
       <button id="nutTaoHopDong" onclick="taoHopDong(this)" disabled>Lập hợp đồng + sinh Quyết định</button>
       <div id="loi" class="error"></div>
@@ -78,10 +77,12 @@
       <label>Giá trị trước</label><input id="plGiaTriTruoc" />
       <label>Giá trị sau</label><input id="plGiaTriSau" />
       <h3>Điều chỉnh tăng số giờ (tuỳ chọn)</h3>
-      <label>Loại nội dung</label>
-      <select id="plLoaiNoiDung"></select>
-      <label>Cấp bậc</label>
-      <select id="plCapBac"><option value="DaiHoc">Đại học</option><option value="SauDaiHoc">Sau đại học</option></select>
+      <label>Mục</label>
+      <select id="plCapBac">
+        <option value="DaiHoc">Giờ chuẩn giảng dạy Đại học</option>
+        <option value="SauDaiHoc">Giờ chuẩn giảng dạy Sau đại học</option>
+        <option value="NCKH">Giờ chuẩn Nghiên cứu khoa học</option>
+      </select>
       <label>Số giờ tăng thêm</label><input id="plSoGioTang" type="number" min="0" />
       <button onclick="luuPhuLuc(this)">Lưu phụ lục</button>
       <button class="secondary" onclick="dongPhuLuc()">Đóng</button>
@@ -95,21 +96,15 @@
     requireRole('Admin');
     initNav();
     let giangVienChon = null;
-    let danhMucNoiDung = [];
-    let danhMucNoiDungMap = {};
     let phanCongChon = null;
 
     async function khoiTao() {
-      const [donVis, namHocs, noiDungs] = await Promise.all([
+      const [donVis, namHocs] = await Promise.all([
         callApi('danhSachDonVi', {}),
         callApi('danhSachNamHoc', {}),
-        callApi('danhMucNoiDungGiangDay', {}),
       ]);
       document.getElementById('donViChon').innerHTML = donVis.map(d => `<option value="${d.ID_DonVi}">${d.Ten_DonVi}</option>`).join('');
       document.getElementById('namHocChon').innerHTML = namHocs.map(n => `<option value="${n.ID_NamHoc}">${n.Ten_NamHoc}</option>`).join('');
-      danhMucNoiDung = noiDungs;
-      noiDungs.forEach(nd => { danhMucNoiDungMap[nd.ID_NoiDung] = nd.Ten_NoiDung; });
-      document.getElementById('plLoaiNoiDung').innerHTML = noiDungs.map(nd => `<option value="${nd.ID_NoiDung}">${nd.Ten_NoiDung}</option>`).join('');
       taiDanhSachHopDong();
     }
     khoiTao();
@@ -141,8 +136,9 @@
       nutTao.disabled = true;
       baoThongDiep('thongDiepPhanCong', '', true);
 
+      const tomTatEl = document.getElementById('tomTatGioDuKien');
       if (!giangVienChon) {
-        document.getElementById('bangGioDuKien').innerHTML = '<tr><td colspan="3" style="color:#777;">Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.</td></tr>';
+        tomTatEl.textContent = 'Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.';
         return;
       }
       const idDonVi = document.getElementById('donViChon').value;
@@ -152,22 +148,18 @@
       try {
         const ketQua = await callApi('timPhanCongTheoGiangVien', { idGiangVien: giangVienChon.ID_GiangVien, idDonVi, idNamHoc });
         if (!ketQua || !ketQua.chiTietGio || !ketQua.chiTietGio.length) {
-          document.getElementById('bangGioDuKien').innerHTML = '<tr><td colspan="3" style="color:#777;">Chưa có dữ liệu.</td></tr>';
+          tomTatEl.textContent = 'Chưa có dữ liệu.';
           baoThongDiep('thongDiepPhanCong', 'Đơn vị chưa lập danh sách hoặc chưa nộp giờ giảng dự kiến cho giảng viên này trong năm học đã chọn — không thể lập hợp đồng.', false);
           return;
         }
         phanCongChon = ketQua.phanCong;
-        const gomTheoNoiDung = {};
-        ketQua.chiTietGio.forEach(ct => {
-          if (!gomTheoNoiDung[ct.ID_NoiDung]) gomTheoNoiDung[ct.ID_NoiDung] = { DaiHoc: 0, SauDaiHoc: 0 };
-          gomTheoNoiDung[ct.ID_NoiDung][ct.Cap_Bac] = Number(ct.So_Gio);
-        });
-        document.getElementById('bangGioDuKien').innerHTML = Object.keys(gomTheoNoiDung).map(idNd => `
-          <tr>
-            <td>${danhMucNoiDungMap[idNd] || idNd}</td>
-            <td>${gomTheoNoiDung[idNd].DaiHoc || 0}</td>
-            <td>${gomTheoNoiDung[idNd].SauDaiHoc || 0}</td>
-          </tr>`).join('');
+        const m = { DaiHoc: 0, SauDaiHoc: 0, NCKH: 0 };
+        ketQua.chiTietGio.forEach(ct => { m[ct.Cap_Bac] = Number(ct.So_Gio); });
+        const tong = m.DaiHoc + m.SauDaiHoc + m.NCKH;
+        tomTatEl.innerHTML = `Tổng số giờ chuẩn quy đổi: <strong>${tong}</strong> giờ, trong đó:<br>
+          - Tổng số giờ chuẩn giảng dạy đại học: <strong>${m.DaiHoc}</strong> giờ<br>
+          - Tổng số giờ chuẩn giảng dạy sau đại học: <strong>${m.SauDaiHoc}</strong> giờ<br>
+          - Tổng số giờ chuẩn nghiên cứu khoa học: <strong>${m.NCKH}</strong> giờ`;
         nutTao.disabled = false;
       } catch (err) {
         baoThongDiep('thongDiepPhanCong', err.message, false);
@@ -200,7 +192,7 @@
           phanCongChon = null;
           document.getElementById('thongTinGV').innerHTML = '';
           document.getElementById('cccd').value = '';
-          document.getElementById('bangGioDuKien').innerHTML = '<tr><td colspan="3" style="color:#777;">Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.</td></tr>';
+          document.getElementById('tomTatGioDuKien').textContent = 'Chọn giảng viên, đơn vị và năm học để xem giờ đơn vị đã nộp.';
           document.getElementById('nutTaoHopDong').disabled = true;
           taiDanhSachHopDong();
         } catch (err) {
@@ -299,7 +291,6 @@
       };
       if (soGioTang > 0) {
         phuLuc.dieuChinhGio = {
-          ID_NoiDung: document.getElementById('plLoaiNoiDung').value,
           Cap_Bac: document.getElementById('plCapBac').value,
           So_Gio_Tang: soGioTang,
         };
