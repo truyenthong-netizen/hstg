@@ -24,35 +24,37 @@
   <main>
     <div class="card">
       <h2>Đơn vị</h2>
+      <div id="thongDiepDonViBang" style="margin-bottom:8px;"></div>
       <table>
-        <thead><tr><th>Tên đơn vị</th><th>Mã đơn vị</th><th>Người phụ trách</th></tr></thead>
+        <thead><tr><th>Tên đơn vị</th><th>Mã đơn vị</th><th>Người phụ trách</th><th>Thao tác</th></tr></thead>
         <tbody id="bangDonVi"></tbody>
       </table>
       <h3>Thêm đơn vị mới</h3>
       <label>Tên đơn vị *</label><input id="dvTen" />
       <label>Mã đơn vị *</label><input id="dvMa" placeholder="VD: KHOA_YHCT" />
       <label>Người phụ trách (tên đăng nhập sẽ gán sau)</label><input id="dvNguoiPhuTrach" />
-      <button onclick="taoDonVi()">Thêm đơn vị</button>
-      <div id="loiDonVi" class="error"></div>
+      <button onclick="taoDonVi(this)">Thêm đơn vị</button>
+      <div id="thongDiepDonVi" style="margin-top:8px;"></div>
     </div>
 
     <div class="card">
       <h2>Năm học</h2>
+      <div id="thongDiepNamHocBang" style="margin-bottom:8px;"></div>
       <table>
-        <thead><tr><th>Tên năm học</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead>
+        <thead><tr><th>Tên năm học</th><th>Từ ngày</th><th>Đến ngày</th><th>Thao tác</th></tr></thead>
         <tbody id="bangNamHoc"></tbody>
       </table>
       <h3>Thêm năm học mới</h3>
       <label>Tên năm học * (VD: 2026-2027)</label><input id="nhTen" />
       <label>Ngày bắt đầu * (01/7)</label><input id="nhBatDau" type="date" />
       <label>Ngày kết thúc * (30/6 năm sau)</label><input id="nhKetThuc" type="date" />
-      <button onclick="taoNamHoc()">Thêm năm học</button>
-      <div id="loiNamHoc" class="error"></div>
+      <button onclick="taoNamHoc(this)">Thêm năm học</button>
+      <div id="thongDiepNamHoc" style="margin-top:8px;"></div>
     </div>
 
     <div class="card">
       <h2>Định mức chi thỉnh giảng theo học hàm/học vị</h2>
-      <p style="font-size:13px; color:#555;">Theo Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV). Khi thay định mức, thêm dòng mới với ngày hiệu lực mới — không sửa dòng cũ, để giữ đúng lịch sử tính thù lao các hợp đồng trước đó.</p>
+      <p style="font-size:13px; color:#555;">Theo Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV). Khi thay định mức, thêm dòng mới với ngày hiệu lực mới — không sửa/xoá dòng cũ, để giữ đúng lịch sử tính thù lao các hợp đồng trước đó. Vì vậy màn hình này chỉ cho phép thêm mới.</p>
       <table>
         <thead><tr><th>Học hàm/học vị</th><th>Đơn giá (đ/tiết chuẩn)</th><th>Hiệu lực từ</th><th>Hiệu lực đến</th><th>Căn cứ</th></tr></thead>
         <tbody id="bangDinhMuc"></tbody>
@@ -66,8 +68,8 @@
       <label>Hiệu lực từ</label><input id="dmTuNgay" type="date" />
       <label>Hiệu lực đến (để trống nếu chưa xác định)</label><input id="dmDenNgay" type="date" />
       <label>Căn cứ (VD: Quy chế chi tiêu nội bộ năm 2026)</label><input id="dmCanCu" />
-      <button onclick="taoDinhMuc()">Thêm định mức</button>
-      <div id="loiDinhMuc" class="error"></div>
+      <button onclick="taoDinhMuc(this)">Thêm định mức</button>
+      <div id="thongDiepDinhMuc" style="margin-top:8px;"></div>
     </div>
   </main>
 
@@ -76,76 +78,203 @@
     requireRole('Admin');
     initNav();
 
+    let dsDonVi = [];
+    let dsNamHoc = [];
+    let dsDinhMuc = [];
+    let idDonViDangSua = null;
+    let idNamHocDangSua = null;
+
     async function taiTatCa() {
       const [donVis, namHocs, dinhMucs] = await Promise.all([
         callApi('danhSachDonVi', {}),
         callApi('danhSachNamHoc', {}),
         callApi('danhSachDinhMuc', {}),
       ]);
-      document.getElementById('bangDonVi').innerHTML = donVis.map(d => `
-        <tr><td>${d.Ten_DonVi}</td><td>${d.Ma_DonVi}</td><td>${d.Nguoi_Phu_Trach || ''}</td></tr>`).join('');
-      document.getElementById('bangNamHoc').innerHTML = namHocs.map(n => `
-        <tr><td>${n.Ten_NamHoc}</td><td>${n.Ngay_BatDau}</td><td>${n.Ngay_KetThuc}</td></tr>`).join('');
-      document.getElementById('bangDinhMuc').innerHTML = dinhMucs.map(d => `
+      dsDonVi = donVis;
+      dsNamHoc = namHocs;
+      dsDinhMuc = dinhMucs;
+      veDonVi();
+      veNamHoc();
+      veDinhMuc();
+    }
+
+    function veDonVi() {
+      document.getElementById('bangDonVi').innerHTML = dsDonVi.map(d => {
+        if (d.ID_DonVi === idDonViDangSua) {
+          return `
+          <tr>
+            <td><input id="sdv_ten_${d.ID_DonVi}" value="${escAttr(d.Ten_DonVi)}" /></td>
+            <td>${d.Ma_DonVi}</td>
+            <td><input id="sdv_phutrach_${d.ID_DonVi}" value="${escAttr(d.Nguoi_Phu_Trach || '')}" /></td>
+            <td>
+              <button onclick="suaDonViLuu(this, '${d.ID_DonVi}')">Lưu</button>
+              <button class="secondary" onclick="suaDonViHuy()">Huỷ</button>
+            </td>
+          </tr>`;
+        }
+        return `
+        <tr>
+          <td>${d.Ten_DonVi}</td><td>${d.Ma_DonVi}</td><td>${d.Nguoi_Phu_Trach || ''}</td>
+          <td>
+            <button class="secondary" onclick="suaDonViBatDau('${d.ID_DonVi}')">Sửa</button>
+            <button class="secondary" onclick="xoaDonVi(this, '${d.ID_DonVi}', '${escAttr(d.Ten_DonVi)}')">Xoá</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function suaDonViBatDau(id) { idDonViDangSua = id; veDonVi(); }
+    function suaDonViHuy() { idDonViDangSua = null; veDonVi(); }
+
+    async function suaDonViLuu(btn, id) {
+      const ten = document.getElementById('sdv_ten_' + id).value.trim();
+      const phuTrach = document.getElementById('sdv_phutrach_' + id).value.trim();
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('suaDonVi', { idDonVi: id, patch: { Ten_DonVi: ten, Nguoi_Phu_Trach: phuTrach } });
+          idDonViDangSua = null;
+          baoThongDiep('thongDiepDonViBang', 'Đã cập nhật đơn vị.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepDonViBang', err.message, false);
+        }
+      });
+    }
+
+    async function xoaDonVi(btn, id, ten) {
+      if (!confirm('Xoá hẳn đơn vị "' + ten + '"? Không thể hoàn tác.')) return;
+      await chayVoiNutBan(btn, 'Đang xoá...', async () => {
+        try {
+          await callApi('xoaDonVi', { idDonVi: id });
+          baoThongDiep('thongDiepDonViBang', 'Đã xoá đơn vị.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepDonViBang', err.message, false);
+        }
+      });
+    }
+
+    function veNamHoc() {
+      document.getElementById('bangNamHoc').innerHTML = dsNamHoc.map(n => {
+        if (n.ID_NamHoc === idNamHocDangSua) {
+          return `
+          <tr>
+            <td><input id="snh_ten_${n.ID_NamHoc}" value="${escAttr(n.Ten_NamHoc)}" /></td>
+            <td><input id="snh_batdau_${n.ID_NamHoc}" type="date" value="${n.Ngay_BatDau || ''}" /></td>
+            <td><input id="snh_ketthuc_${n.ID_NamHoc}" type="date" value="${n.Ngay_KetThuc || ''}" /></td>
+            <td>
+              <button onclick="suaNamHocLuu(this, '${n.ID_NamHoc}')">Lưu</button>
+              <button class="secondary" onclick="suaNamHocHuy()">Huỷ</button>
+            </td>
+          </tr>`;
+        }
+        return `
+        <tr>
+          <td>${n.Ten_NamHoc}</td><td>${n.Ngay_BatDau}</td><td>${n.Ngay_KetThuc}</td>
+          <td>
+            <button class="secondary" onclick="suaNamHocBatDau('${n.ID_NamHoc}')">Sửa</button>
+            <button class="secondary" onclick="xoaNamHoc(this, '${n.ID_NamHoc}', '${escAttr(n.Ten_NamHoc)}')">Xoá</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function suaNamHocBatDau(id) { idNamHocDangSua = id; veNamHoc(); }
+    function suaNamHocHuy() { idNamHocDangSua = null; veNamHoc(); }
+
+    async function suaNamHocLuu(btn, id) {
+      const ten = document.getElementById('snh_ten_' + id).value.trim();
+      const batDau = document.getElementById('snh_batdau_' + id).value;
+      const ketThuc = document.getElementById('snh_ketthuc_' + id).value;
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('suaNamHoc', { idNamHoc: id, patch: { Ten_NamHoc: ten, Ngay_BatDau: batDau, Ngay_KetThuc: ketThuc } });
+          idNamHocDangSua = null;
+          baoThongDiep('thongDiepNamHocBang', 'Đã cập nhật năm học.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepNamHocBang', err.message, false);
+        }
+      });
+    }
+
+    async function xoaNamHoc(btn, id, ten) {
+      if (!confirm('Xoá hẳn năm học "' + ten + '"? Không thể hoàn tác.')) return;
+      await chayVoiNutBan(btn, 'Đang xoá...', async () => {
+        try {
+          await callApi('xoaNamHoc', { idNamHoc: id });
+          baoThongDiep('thongDiepNamHocBang', 'Đã xoá năm học.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepNamHocBang', err.message, false);
+        }
+      });
+    }
+
+    function veDinhMuc() {
+      document.getElementById('bangDinhMuc').innerHTML = dsDinhMuc.map(d => `
         <tr><td>${d.Hoc_Ham_Hoc_Vi}</td><td>${Number(d.Don_Gia_Gio_Chuan).toLocaleString('vi-VN')}</td><td>${d.Ngay_Hieu_Luc_Tu}</td><td>${d.Ngay_Hieu_Luc_Den || '(chưa xác định)'}</td><td>${d.Can_Cu_Quy_Che || ''}</td></tr>`).join('');
     }
 
-    async function taoDonVi() {
-      const loiEl = document.getElementById('loiDonVi');
-      loiEl.textContent = '';
-      try {
-        await callApi('taoDonVi', {
-          donVi: {
-            Ten_DonVi: document.getElementById('dvTen').value,
-            Ma_DonVi: document.getElementById('dvMa').value,
-            Nguoi_Phu_Trach: document.getElementById('dvNguoiPhuTrach').value,
-          },
-        });
-        document.getElementById('dvTen').value = '';
-        document.getElementById('dvMa').value = '';
-        document.getElementById('dvNguoiPhuTrach').value = '';
-        taiTatCa();
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+    async function taoDonVi(btn) {
+      await chayVoiNutBan(btn, 'Đang thêm...', async () => {
+        try {
+          await callApi('taoDonVi', {
+            donVi: {
+              Ten_DonVi: document.getElementById('dvTen').value,
+              Ma_DonVi: document.getElementById('dvMa').value,
+              Nguoi_Phu_Trach: document.getElementById('dvNguoiPhuTrach').value,
+            },
+          });
+          baoThongDiep('thongDiepDonVi', 'Đã thêm đơn vị.', true);
+          document.getElementById('dvTen').value = '';
+          document.getElementById('dvMa').value = '';
+          document.getElementById('dvNguoiPhuTrach').value = '';
+          taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepDonVi', err.message, false);
+        }
+      });
     }
 
-    async function taoNamHoc() {
-      const loiEl = document.getElementById('loiNamHoc');
-      loiEl.textContent = '';
-      try {
-        await callApi('taoNamHoc', {
-          namHoc: {
-            Ten_NamHoc: document.getElementById('nhTen').value,
-            Ngay_BatDau: document.getElementById('nhBatDau').value,
-            Ngay_KetThuc: document.getElementById('nhKetThuc').value,
-          },
-        });
-        document.getElementById('nhTen').value = '';
-        taiTatCa();
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+    async function taoNamHoc(btn) {
+      await chayVoiNutBan(btn, 'Đang thêm...', async () => {
+        try {
+          await callApi('taoNamHoc', {
+            namHoc: {
+              Ten_NamHoc: document.getElementById('nhTen').value,
+              Ngay_BatDau: document.getElementById('nhBatDau').value,
+              Ngay_KetThuc: document.getElementById('nhKetThuc').value,
+            },
+          });
+          baoThongDiep('thongDiepNamHoc', 'Đã thêm năm học.', true);
+          document.getElementById('nhTen').value = '';
+          taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepNamHoc', err.message, false);
+        }
+      });
     }
 
-    async function taoDinhMuc() {
-      const loiEl = document.getElementById('loiDinhMuc');
-      loiEl.textContent = '';
-      try {
-        await callApi('taoDinhMuc', {
-          dinhMuc: {
-            Hoc_Ham_Hoc_Vi: document.getElementById('dmHocHam').value,
-            Don_Gia_Gio_Chuan: document.getElementById('dmDonGia').value,
-            Ngay_Hieu_Luc_Tu: document.getElementById('dmTuNgay').value,
-            Ngay_Hieu_Luc_Den: document.getElementById('dmDenNgay').value,
-            Can_Cu_Quy_Che: document.getElementById('dmCanCu').value,
-          },
-        });
-        document.getElementById('dmDonGia').value = '';
-        taiTatCa();
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+    async function taoDinhMuc(btn) {
+      await chayVoiNutBan(btn, 'Đang thêm...', async () => {
+        try {
+          await callApi('taoDinhMuc', {
+            dinhMuc: {
+              Hoc_Ham_Hoc_Vi: document.getElementById('dmHocHam').value,
+              Don_Gia_Gio_Chuan: document.getElementById('dmDonGia').value,
+              Ngay_Hieu_Luc_Tu: document.getElementById('dmTuNgay').value,
+              Ngay_Hieu_Luc_Den: document.getElementById('dmDenNgay').value,
+              Can_Cu_Quy_Che: document.getElementById('dmCanCu').value,
+            },
+          });
+          baoThongDiep('thongDiepDinhMuc', 'Đã thêm định mức.', true);
+          document.getElementById('dmDonGia').value = '';
+          taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepDinhMuc', err.message, false);
+        }
+      });
     }
 
     taiTatCa();

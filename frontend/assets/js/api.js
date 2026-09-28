@@ -4,7 +4,7 @@
  * QUAN TRỌNG: API_BASE_URL nên trỏ tới Cloudflare Worker proxy (xem /cloudflare-worker),
  * KHÔNG trỏ thẳng URL Apps Script, để tránh vướng CORS (xem ghi chú trong Code.gs).
  */
-const API_BASE_URL = 'https://hstg-proxy.tccb.workers.dev/'; // TODO: đổi sau khi deploy Worker
+const API_BASE_URL = 'https://YOUR-WORKER-SUBDOMAIN.workers.dev'; // TODO: đổi sau khi deploy Worker
 
 function getToken() {
   return localStorage.getItem('token');
@@ -47,6 +47,41 @@ function initNav() {
   });
   const hoTenEl = document.getElementById('hoTenHienTai');
   if (hoTenEl) hoTenEl.textContent = (localStorage.getItem('hoTen') || '') + ' (' + vaiTro + ')';
+}
+
+/**
+ * Vô hiệu hoá nút bấm trong lúc gọi fn() (đổi nhãn nút sang "Đang xử lý...") để:
+ * 1) người dùng biết hệ thống đang chạy thay vì tưởng nút không hoạt động,
+ * 2) chặn bấm nhiều lần liên tiếp gây gửi trùng dữ liệu lên server.
+ * Dùng: <button onclick="luuGiDo(this)">...</button>  rồi trong hàm: await chayVoiNutBan(btn, 'Đang lưu...', async () => {...});
+ */
+async function chayVoiNutBan(btn, nhanDangXuLy, fn) {
+  if (!btn) return fn();
+  const nhanGoc = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = nhanDangXuLy || 'Đang xử lý...';
+  try {
+    return await fn();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = nhanGoc;
+  }
+}
+
+/** Hiện thông báo tạm thời (xanh = thành công, đỏ = lỗi) rồi tự mờ đi sau vài giây. */
+function baoThongDiep(elId, msg, thanhCong) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = thanhCong ? '#1a7a35' : '#b3261e';
+  if (thanhCong) {
+    setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 4000);
+  }
+}
+
+/** Escape giá trị khi chèn vào thuộc tính HTML (value="...") để tránh vỡ layout với tên có dấu nháy. */
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /** Gọi 1 action tới backend. payload sẽ tự động kèm token hiện tại. */

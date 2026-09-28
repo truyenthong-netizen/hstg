@@ -43,7 +43,7 @@
         <tbody id="bangGioThucTe"></tbody>
       </table>
 
-      <button onclick="thucHienThanhLy()">Bước 10-11 — Kiểm tra &amp; Thanh lý</button>
+      <button onclick="thucHienThanhLy(this)">Bước 10-11 — Kiểm tra &amp; Thanh lý</button>
       <div id="loiThanhLy" class="error"></div>
       <div id="ketQuaThanhLy" style="color:#1a7a35; margin-top:8px;"></div>
     </div>
@@ -86,9 +86,10 @@
       document.getElementById('ketQuaThanhLy').textContent = '';
     }
 
-    async function thucHienThanhLy() {
+    async function thucHienThanhLy(btn) {
       const loiEl = document.getElementById('loiThanhLy');
       loiEl.textContent = '';
+      document.getElementById('ketQuaThanhLy').textContent = '';
       const chiTietGioThucTe = [];
       danhMucNoiDung.forEach(nd => {
         const dh = Number(document.getElementById('dh_' + nd.ID_NoiDung).value || 0);
@@ -97,27 +98,29 @@
         if (sdh > 0) chiTietGioThucTe.push({ ID_NoiDung: nd.ID_NoiDung, Cap_Bac: 'SauDaiHoc', So_Gio: sdh });
       });
 
-      try {
-        // Bước 9: lập Giấy xác nhận giờ giảng làm căn cứ
-        const gcn = await callApi('taoGiayXacNhan', {
-          gcn: {
-            ID_HopDong: hopDongChon.ID_HopDong,
-            Thoi_Gian_Tu_Den: document.getElementById('tlThoiGian').value,
-            Nguoi_Xac_Nhan: document.getElementById('tlNguoiXacNhan').value,
-            Chuc_Vu_Nguoi_Xac_Nhan: document.getElementById('tlChucVu').value,
-            chiTietGioThucTe: chiTietGioThucTe,
-          },
-        });
+      await chayVoiNutBan(btn, 'Đang xử lý...', async () => {
+        try {
+          // Bước 9: lập Giấy xác nhận giờ giảng làm căn cứ
+          const gcn = await callApi('taoGiayXacNhan', {
+            gcn: {
+              ID_HopDong: hopDongChon.ID_HopDong,
+              Thoi_Gian_Tu_Den: document.getElementById('tlThoiGian').value,
+              Nguoi_Xac_Nhan: document.getElementById('tlNguoiXacNhan').value,
+              Chuc_Vu_Nguoi_Xac_Nhan: document.getElementById('tlChucVu').value,
+              chiTietGioThucTe: chiTietGioThucTe,
+            },
+          });
 
-        // Bước 10-11: kiểm tra ràng buộc + thanh lý (backend tự chặn nếu vượt giờ)
-        const ketQua = await callApi('thanhLyHopDong', { idHopDong: hopDongChon.ID_HopDong, idGCN: gcn.ID_GCN });
-        document.getElementById('ketQuaThanhLy').textContent =
-          `Đã thanh lý. Biên bản ${ketQua.Ma_So_BienBan} — Tổng giờ chuẩn: ${ketQua.Tong_So_Gio_Chuan_ThucTe} — Thành tiền: ${Number(ketQua.Thanh_Tien).toLocaleString('vi-VN')} đ`;
-        document.getElementById('cardThanhLy').style.display = 'none';
-        taiDanhSachHopDong();
-      } catch (err) {
-        loiEl.textContent = err.message; // VD: "Số giờ thực tế không được vượt quá số giờ theo hợp đồng (X giờ)"
-      }
+          // Bước 10-11: kiểm tra ràng buộc + thanh lý (backend tự chặn nếu vượt giờ)
+          const ketQua = await callApi('thanhLyHopDong', { idHopDong: hopDongChon.ID_HopDong, idGCN: gcn.ID_GCN });
+          document.getElementById('ketQuaThanhLy').textContent =
+            `Đã thanh lý. Biên bản ${ketQua.Ma_So_BienBan} — Tổng giờ chuẩn: ${ketQua.Tong_So_Gio_Chuan_ThucTe} — Thành tiền: ${Number(ketQua.Thanh_Tien).toLocaleString('vi-VN')} đ`;
+          document.getElementById('cardThanhLy').style.display = 'none';
+          taiDanhSachHopDong();
+        } catch (err) {
+          loiEl.textContent = err.message; // VD: "Số giờ thực tế không được vượt quá số giờ theo hợp đồng (X giờ)"
+        }
+      });
     }
 
     khoiTao();

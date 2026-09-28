@@ -18,12 +18,17 @@ var ACTION_MAP = {
   danhSachNguoiDung: api_danhSachNguoiDung,
   taoNguoiDung: api_taoNguoiDung,
   suaNguoiDung: api_suaNguoiDung,
+  xoaNguoiDung: api_xoaNguoiDung,
 
   // Danh mục
   danhSachDonVi: api_danhSachDonVi,
   taoDonVi: api_taoDonVi,
+  suaDonVi: api_suaDonVi,
+  xoaDonVi: api_xoaDonVi,
   danhSachNamHoc: api_danhSachNamHoc,
   taoNamHoc: api_taoNamHoc,
+  suaNamHoc: api_suaNamHoc,
+  xoaNamHoc: api_xoaNamHoc,
   danhMucNoiDungGiangDay: api_danhMucNoiDungGiangDay,
   danhSachDinhMuc: api_danhSachDinhMuc,
   taoDinhMuc: api_taoDinhMuc,

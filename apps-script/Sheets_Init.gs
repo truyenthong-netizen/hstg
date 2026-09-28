@@ -62,6 +62,11 @@ function napDanhMucMacDinh_() {
  */
 function taoTaiKhoanAdminDauTien() {
   var matKhauMacDinh = 'CHANGE_ME_123'; // TODO: đổi trước khi chạy
+  var daCo = sheetToObjects_(SHEETS.NGUOI_DUNG).some(function (u) { return u.Ten_Dang_Nhap === 'admin'; });
+  if (daCo) {
+    Logger.log('Tài khoản "admin" đã tồn tại — không tạo trùng. Muốn thêm Admin khác, dùng trang Người dùng sau khi đăng nhập.');
+    return;
+  }
   appendRow_(SHEETS.NGUOI_DUNG, {
     ID_NguoiDung: newId_('U'),
     Ten_Dang_Nhap: 'admin',
@@ -73,4 +78,27 @@ function taoTaiKhoanAdminDauTien() {
     Ngay_Tao: todayStr_(),
   });
   Logger.log('Đã tạo tài khoản admin. Đăng nhập bằng admin / ' + matKhauMacDinh + ' rồi đổi mật khẩu ngay.');
+}
+
+/**
+ * Chạy TAY 1 LẦN từ Apps Script editor nếu bảng NGUOI_DUNG đang có tài khoản bị trùng
+ * Tên đăng nhập (ví dụ do taoTaiKhoanAdminDauTien từng bị chạy nhiều lần trước khi
+ * hàm này được thêm chống trùng). Giữ lại dòng xuất hiện ĐẦU TIÊN của mỗi tên đăng nhập,
+ * xoá các dòng trùng phía sau. An toàn khi chạy nhiều lần (không còn trùng thì không xoá gì).
+ */
+function gomTaiKhoanTrungTenDangNhap() {
+  var all = sheetToObjects_(SHEETS.NGUOI_DUNG);
+  var daGap = {};
+  var dongCanXoa = [];
+  all.forEach(function (u) {
+    if (daGap[u.Ten_Dang_Nhap]) {
+      dongCanXoa.push(u.__row);
+    } else {
+      daGap[u.Ten_Dang_Nhap] = true;
+    }
+  });
+  // Xoá từ dòng dưới lên trên để số dòng các bản ghi còn lại không bị lệch.
+  dongCanXoa.sort(function (a, b) { return b - a; });
+  dongCanXoa.forEach(function (r) { deleteRow_(SHEETS.NGUOI_DUNG, r); });
+  Logger.log('Đã xoá %s tài khoản bị trùng tên đăng nhập.', dongCanXoa.length);
 }

@@ -24,8 +24,9 @@
   <main>
     <div class="card">
       <h2>Danh sách tài khoản</h2>
+      <div id="thongDiepBang" style="margin-bottom:8px;"></div>
       <table>
-        <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Đơn vị</th><th>Trạng thái</th><th></th></tr></thead>
+        <thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Vai trò</th><th>Đơn vị</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
         <tbody id="bangNguoiDung"></tbody>
       </table>
     </div>
@@ -44,9 +45,8 @@
         <label>Đơn vị phụ trách *</label>
         <select id="ndDonVi"></select>
       </div>
-      <button onclick="taoTaiKhoan()">Tạo tài khoản</button>
-      <div id="loi" class="error"></div>
-      <div id="thanhCong" style="color:#1a7a35; margin-top:8px;"></div>
+      <button onclick="taoTaiKhoan(this)">Tạo tài khoản</button>
+      <div id="thongDiepTao" style="margin-top:8px;"></div>
     </div>
   </main>
 
@@ -56,6 +56,8 @@
     initNav();
 
     let danhSachDonVi = [];
+    let danhSachNguoiDungHienTai = [];
+    let idDangSua = null;
 
     function capNhatHienThiDonVi() {
       const vaiTro = document.getElementById('ndVaiTro').value;
@@ -70,56 +72,125 @@
     }
 
     async function taiDanhSachNguoiDung() {
-      const list = await callApi('danhSachNguoiDung', {});
+      danhSachNguoiDungHienTai = await callApi('danhSachNguoiDung', {});
+      ve();
+    }
+
+    function ve() {
       const donViMap = {};
       danhSachDonVi.forEach(d => { donViMap[d.ID_DonVi] = d.Ten_DonVi; });
-      document.getElementById('bangNguoiDung').innerHTML = list.map(u => `
+
+      document.getElementById('bangNguoiDung').innerHTML = danhSachNguoiDungHienTai.map(u => {
+        if (u.ID_NguoiDung === idDangSua) {
+          const tuyChonDonVi = danhSachDonVi.map(d => `<option value="${d.ID_DonVi}" ${d.ID_DonVi === u.ID_DonVi ? 'selected' : ''}>${d.Ten_DonVi}</option>`).join('');
+          return `
+          <tr>
+            <td>${u.Ten_Dang_Nhap}</td>
+            <td><input id="sua_hoTen_${u.ID_NguoiDung}" value="${escAttr(u.Ho_Ten)}" /></td>
+            <td>
+              <select id="sua_vaiTro_${u.ID_NguoiDung}" onchange="capNhatHienThiDonViSua('${u.ID_NguoiDung}')">
+                <option value="DonVi" ${u.Vai_Tro === 'DonVi' ? 'selected' : ''}>DonVi</option>
+                <option value="Admin" ${u.Vai_Tro === 'Admin' ? 'selected' : ''}>Admin</option>
+              </select>
+            </td>
+            <td><select id="sua_donVi_${u.ID_NguoiDung}" style="${u.Vai_Tro === 'DonVi' ? '' : 'display:none;'}">${tuyChonDonVi}</select></td>
+            <td>${u.Trang_Thai === 'Hoat_Dong' ? 'Hoạt động' : 'Đã khoá'}</td>
+            <td>
+              <button onclick="luuSua(this, '${u.ID_NguoiDung}')">Lưu</button>
+              <button class="secondary" onclick="huySua()">Huỷ</button>
+            </td>
+          </tr>`;
+        }
+        return `
         <tr>
           <td>${u.Ten_Dang_Nhap}</td>
           <td>${u.Ho_Ten || ''}</td>
           <td>${u.Vai_Tro}</td>
           <td>${donViMap[u.ID_DonVi] || ''}</td>
-          <td>${u.Trang_Thai}</td>
+          <td>${u.Trang_Thai === 'Hoat_Dong' ? 'Hoạt động' : 'Đã khoá'}</td>
           <td>
-            <button class="secondary" onclick="doiTrangThai('${u.ID_NguoiDung}', '${u.Trang_Thai === 'Hoat_Dong' ? 'Khoa' : 'Hoat_Dong'}')">
-              ${u.Trang_Thai === 'Hoat_Dong' ? 'Khoá' : 'Mở khoá'}
-            </button>
+            <button class="secondary" onclick="batDauSua('${u.ID_NguoiDung}')">Sửa</button>
+            <button class="secondary" onclick="doiTrangThai(this, '${u.ID_NguoiDung}', '${u.Trang_Thai === 'Hoat_Dong' ? 'Khoa' : 'Hoat_Dong'}')">${u.Trang_Thai === 'Hoat_Dong' ? 'Khoá' : 'Mở khoá'}</button>
+            <button class="secondary" onclick="xoaTaiKhoan(this, '${u.ID_NguoiDung}', '${escAttr(u.Ten_Dang_Nhap)}')">Xoá</button>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     }
 
-    async function taoTaiKhoan() {
-      const loiEl = document.getElementById('loi');
-      loiEl.textContent = '';
-      document.getElementById('thanhCong').textContent = '';
+    function batDauSua(id) { idDangSua = id; ve(); }
+    function huySua() { idDangSua = null; ve(); }
+
+    function capNhatHienThiDonViSua(id) {
+      const vaiTro = document.getElementById('sua_vaiTro_' + id).value;
+      const sel = document.getElementById('sua_donVi_' + id);
+      if (sel) sel.style.display = vaiTro === 'DonVi' ? 'inline-block' : 'none';
+    }
+
+    async function luuSua(btn, id) {
+      const hoTen = document.getElementById('sua_hoTen_' + id).value.trim();
+      const vaiTro = document.getElementById('sua_vaiTro_' + id).value;
+      const selDonVi = document.getElementById('sua_donVi_' + id);
+      const idDonVi = vaiTro === 'DonVi' ? (selDonVi ? selDonVi.value : '') : '';
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('suaNguoiDung', { idNguoiDung: id, patch: { Ho_Ten: hoTen, Vai_Tro: vaiTro, ID_DonVi: idDonVi } });
+          idDangSua = null;
+          baoThongDiep('thongDiepBang', 'Đã cập nhật tài khoản.', true);
+          await taiDanhSachNguoiDung();
+        } catch (err) {
+          baoThongDiep('thongDiepBang', err.message, false);
+        }
+      });
+    }
+
+    async function doiTrangThai(btn, idNguoiDung, trangThaiMoi) {
+      await chayVoiNutBan(btn, 'Đang xử lý...', async () => {
+        try {
+          await callApi('suaNguoiDung', { idNguoiDung, patch: { Trang_Thai: trangThaiMoi } });
+          baoThongDiep('thongDiepBang', trangThaiMoi === 'Khoa' ? 'Đã khoá tài khoản.' : 'Đã mở khoá tài khoản.', true);
+          await taiDanhSachNguoiDung();
+        } catch (err) {
+          baoThongDiep('thongDiepBang', err.message, false);
+        }
+      });
+    }
+
+    async function xoaTaiKhoan(btn, idNguoiDung, tenDangNhap) {
+      if (!confirm('Xoá hẳn tài khoản "' + tenDangNhap + '"? Không thể hoàn tác.')) return;
+      await chayVoiNutBan(btn, 'Đang xoá...', async () => {
+        try {
+          await callApi('xoaNguoiDung', { idNguoiDung });
+          baoThongDiep('thongDiepBang', 'Đã xoá tài khoản.', true);
+          await taiDanhSachNguoiDung();
+        } catch (err) {
+          baoThongDiep('thongDiepBang', err.message, false);
+        }
+      });
+    }
+
+    async function taoTaiKhoan(btn) {
+      document.getElementById('thongDiepTao').textContent = '';
       const vaiTro = document.getElementById('ndVaiTro').value;
-      try {
-        await callApi('taoNguoiDung', {
-          nguoiDung: {
-            Ten_Dang_Nhap: document.getElementById('ndTenDangNhap').value.trim(),
-            MatKhau: document.getElementById('ndMatKhau').value,
-            Ho_Ten: document.getElementById('ndHoTen').value,
-            Vai_Tro: vaiTro,
-            ID_DonVi: vaiTro === 'DonVi' ? document.getElementById('ndDonVi').value : '',
-          },
-        });
-        document.getElementById('thanhCong').textContent = 'Đã tạo tài khoản.';
-        document.getElementById('ndTenDangNhap').value = '';
-        document.getElementById('ndMatKhau').value = '';
-        document.getElementById('ndHoTen').value = '';
-        taiDanhSachNguoiDung();
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
-    }
-
-    async function doiTrangThai(idNguoiDung, trangThaiMoi) {
-      try {
-        await callApi('suaNguoiDung', { idNguoiDung, patch: { Trang_Thai: trangThaiMoi } });
-        taiDanhSachNguoiDung();
-      } catch (err) {
-        document.getElementById('loi').textContent = err.message;
-      }
+      await chayVoiNutBan(btn, 'Đang tạo...', async () => {
+        try {
+          await callApi('taoNguoiDung', {
+            nguoiDung: {
+              Ten_Dang_Nhap: document.getElementById('ndTenDangNhap').value.trim(),
+              MatKhau: document.getElementById('ndMatKhau').value,
+              Ho_Ten: document.getElementById('ndHoTen').value,
+              Vai_Tro: vaiTro,
+              ID_DonVi: vaiTro === 'DonVi' ? document.getElementById('ndDonVi').value : '',
+            },
+          });
+          baoThongDiep('thongDiepTao', 'Đã tạo tài khoản.', true);
+          document.getElementById('ndTenDangNhap').value = '';
+          document.getElementById('ndMatKhau').value = '';
+          document.getElementById('ndHoTen').value = '';
+          taiDanhSachNguoiDung();
+        } catch (err) {
+          baoThongDiep('thongDiepTao', err.message, false);
+        }
+      });
     }
 
     khoiTao();

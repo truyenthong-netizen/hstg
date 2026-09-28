@@ -48,6 +48,17 @@ function updateRow_(sheetName, rowIndex, patch) {
   return updated;
 }
 
+/**
+ * Xoá hẳn 1 dòng khỏi sheet theo __row (lấy từ sheetToObjects_).
+ * CHỈ dùng cho các bảng cho phép xoá thật (tài khoản, đơn vị, năm học...).
+ * KHÔNG dùng cho NHAT_KY_THAO_TAC hay PHU_LUC_HOP_DONG — 2 bảng này chỉ được phép ghi thêm
+ * (nguyên tắc append-only, xem Mục 9.10 tài liệu YCNV).
+ */
+function deleteRow_(sheetName, rowIndex) {
+  var sh = getSheet_(sheetName);
+  sh.deleteRow(rowIndex);
+}
+
 /** Sinh ID nội bộ dạng chuỗi ngẫu nhiên ngắn (không phải mã hiển thị cho người dùng). */
 function newId_(prefix) {
   return (prefix || 'ID') + '_' + Utilities.getUuid().split('-')[0];

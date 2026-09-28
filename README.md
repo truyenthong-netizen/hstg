@@ -48,6 +48,8 @@ CCCD mẫu để tra cứu thử: `079001000001` (PGS.TS) hoặc `079001000002` 
 
 **Đổi ngay mật khẩu mẫu trước khi đưa cho người dùng thật** — đây chỉ là dữ liệu chạy thử nội bộ.
 
+**Nếu bảng Người dùng đang có tài khoản `admin` bị hiện trùng 2 dòng** (do trước đây hàm tạo tài khoản Admin đầu tiên từng bị chạy nhiều lần): mở Apps Script editor, chọn hàm `gomTaiKhoanTrungTenDangNhap` (trong `Sheets_Init.gs`), bấm **Run** — hệ thống tự xoá các dòng trùng, chỉ giữ lại dòng đầu tiên. Chạy lại nhiều lần vẫn an toàn. Từ nay `taoTaiKhoanAdminDauTien` cũng đã tự chống trùng.
+
 ## Trạng thái hiện tại
 
 Đã có, chạy được đầy đủ luồng chính, đủ vai trò:
@@ -65,8 +67,11 @@ CCCD mẫu để tra cứu thử: `079001000001` (PGS.TS) hoặc `079001000002` 
 **Vai trò Admin**
 - Lập hợp đồng + tự sinh Quyết định 1-1 (`HopDong.gs`, trang `hop-dong.html`)
 - Lập phụ lục điều chỉnh giờ hợp đồng, tự động nới giới hạn thanh lý tương ứng (`PhuLuc.gs`)
-- Quản lý danh mục: đơn vị, năm học, định mức chi thỉnh giảng theo học hàm/học vị (`DonVi_NamHoc.gs`, `DinhMuc.gs`, trang `danh-muc.html`)
-- Quản lý tài khoản người dùng: tạo tài khoản Đơn vị/Admin, khoá/mở tài khoản (`NguoiDung.gs`, trang `nguoi-dung.html`)
+- Quản lý danh mục: thêm/sửa/xoá đơn vị, thêm/sửa/xoá năm học (xoá bị chặn nếu đã có hợp đồng/danh sách gắn kèm), thêm định mức chi thỉnh giảng theo học hàm/học vị — riêng định mức chỉ cho thêm mới, không sửa/xoá, để giữ đúng lịch sử tính thù lao (`DonVi_NamHoc.gs`, `DinhMuc.gs`, trang `danh-muc.html`)
+- Quản lý tài khoản người dùng: tạo/sửa (họ tên, vai trò, đơn vị)/khoá-mở/xoá tài khoản; luôn giữ lại ít nhất 1 tài khoản Admin đang hoạt động (`NguoiDung.gs`, trang `nguoi-dung.html`)
+
+**Trải nghiệm thao tác**
+- Mọi nút submit đều chuyển sang trạng thái "Đang xử lý..." và tự vô hiệu hoá trong lúc gọi API, để tránh bấm nhiều lần gây gửi trùng dữ liệu, và luôn có thông báo thành công/lỗi rõ ràng sau khi xong (`api.js` → `chayVoiNutBan`, `baoThongDiep`).
 
 Còn là khung/placeholder, cần hoàn thiện thêm trước khi dùng dữ liệu thật:
 - Xuất PDF hợp đồng/quyết định/GCN/biên bản thanh lý từ mẫu Google Docs thật (`ExportUtils.gs` — đang là TODO với ID mẫu giả, cần đơn vị chuyển các file .docx đã cung cấp sang Google Docs và đặt placeholder)

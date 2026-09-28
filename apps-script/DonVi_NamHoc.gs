@@ -53,3 +53,79 @@ function api_taoDonVi(payload) {
   ghiNhatKy_('DON_VI', record.ID_DonVi, 'Tao_Moi', null, record, session.tenDangNhap);
   return okResponse_(record);
 }
+
+/** Admin sửa tên/người phụ trách đơn vị. Không cho đổi Mã đơn vị (dùng làm khoá tự nhiên ổn định). */
+function api_suaDonVi(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.DON_VI);
+  var target = all.filter(function (dv) { return dv.ID_DonVi === payload.idDonVi; })[0];
+  if (!target) return errorResponse_('Không tìm thấy đơn vị', 'NOT_FOUND');
+
+  var p = payload.patch || {};
+  var patch = {};
+  if (p.Ten_DonVi) patch.Ten_DonVi = p.Ten_DonVi;
+  if (p.Nguoi_Phu_Trach !== undefined) patch.Nguoi_Phu_Trach = p.Nguoi_Phu_Trach;
+
+  var before = { Ten_DonVi: target.Ten_DonVi, Nguoi_Phu_Trach: target.Nguoi_Phu_Trach };
+  updateRow_(SHEETS.DON_VI, target.__row, patch);
+  ghiNhatKy_('DON_VI', target.ID_DonVi, 'Chinh_Sua', before, patch, session.tenDangNhap);
+  return okResponse_({});
+}
+
+/** Xoá đơn vị — chỉ cho phép nếu chưa có hợp đồng, danh sách thỉnh giảng hoặc tài khoản nào gắn với đơn vị này. */
+function api_xoaDonVi(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.DON_VI);
+  var target = all.filter(function (dv) { return dv.ID_DonVi === payload.idDonVi; })[0];
+  if (!target) return errorResponse_('Không tìm thấy đơn vị', 'NOT_FOUND');
+
+  var dangDung =
+    sheetToObjects_(SHEETS.HOP_DONG).some(function (r) { return r.ID_DonVi === target.ID_DonVi; }) ||
+    sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).some(function (r) { return r.ID_DonVi === target.ID_DonVi; }) ||
+    sheetToObjects_(SHEETS.NGUOI_DUNG).some(function (r) { return r.ID_DonVi === target.ID_DonVi; });
+  if (dangDung) {
+    return errorResponse_('Đơn vị đang được dùng (có hợp đồng, danh sách hoặc tài khoản gắn kèm) — không thể xoá', 'IN_USE');
+  }
+
+  deleteRow_(SHEETS.DON_VI, target.__row);
+  ghiNhatKy_('DON_VI', target.ID_DonVi, 'Xoa', { Ten_DonVi: target.Ten_DonVi, Ma_DonVi: target.Ma_DonVi }, null, session.tenDangNhap);
+  return okResponse_({});
+}
+
+/** Admin sửa năm học. */
+function api_suaNamHoc(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.NAM_HOC);
+  var target = all.filter(function (nh) { return nh.ID_NamHoc === payload.idNamHoc; })[0];
+  if (!target) return errorResponse_('Không tìm thấy năm học', 'NOT_FOUND');
+
+  var p = payload.patch || {};
+  var patch = {};
+  if (p.Ten_NamHoc) patch.Ten_NamHoc = p.Ten_NamHoc;
+  if (p.Ngay_BatDau) patch.Ngay_BatDau = p.Ngay_BatDau;
+  if (p.Ngay_KetThuc) patch.Ngay_KetThuc = p.Ngay_KetThuc;
+
+  var before = { Ten_NamHoc: target.Ten_NamHoc, Ngay_BatDau: target.Ngay_BatDau, Ngay_KetThuc: target.Ngay_KetThuc };
+  updateRow_(SHEETS.NAM_HOC, target.__row, patch);
+  ghiNhatKy_('NAM_HOC', target.ID_NamHoc, 'Chinh_Sua', before, patch, session.tenDangNhap);
+  return okResponse_({});
+}
+
+/** Xoá năm học — chỉ cho phép nếu chưa có hợp đồng hoặc danh sách thỉnh giảng nào gắn với năm học này. */
+function api_xoaNamHoc(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.NAM_HOC);
+  var target = all.filter(function (nh) { return nh.ID_NamHoc === payload.idNamHoc; })[0];
+  if (!target) return errorResponse_('Không tìm thấy năm học', 'NOT_FOUND');
+
+  var dangDung =
+    sheetToObjects_(SHEETS.HOP_DONG).some(function (r) { return r.ID_NamHoc === target.ID_NamHoc; }) ||
+    sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).some(function (r) { return r.ID_NamHoc === target.ID_NamHoc; });
+  if (dangDung) {
+    return errorResponse_('Năm học đang được dùng (có hợp đồng hoặc danh sách gắn kèm) — không thể xoá', 'IN_USE');
+  }
+
+  deleteRow_(SHEETS.NAM_HOC, target.__row);
+  ghiNhatKy_('NAM_HOC', target.ID_NamHoc, 'Xoa', { Ten_NamHoc: target.Ten_NamHoc }, null, session.tenDangNhap);
+  return okResponse_({});
+}

@@ -56,19 +56,69 @@ function api_taoNguoiDung(payload) {
   });
 }
 
-/** Khoá/mở tài khoản, đổi mật khẩu. payload.patch có thể gồm Trang_Thai và/hoặc MatKhauMoi. */
+/** Đếm số tài khoản Admin đang Hoạt_Dong, không tính idBoQua — dùng để chặn khoá/xoá/hạ quyền tài khoản Admin cuối cùng. */
+function demAdminHoatDong_(idBoQua) {
+  return sheetToObjects_(SHEETS.NGUOI_DUNG).filter(function (u) {
+    return u.Vai_Tro === 'Admin' && u.Trang_Thai === 'Hoat_Dong' && u.ID_NguoiDung !== idBoQua;
+  }).length;
+}
+
+/**
+ * Sửa tài khoản: khoá/mở (Trang_Thai), đổi họ tên/vai trò/đơn vị, và/hoặc đổi mật khẩu.
+ * payload.patch có thể gồm: Trang_Thai, Ho_Ten, Vai_Tro, ID_DonVi, MatKhauMoi.
+ */
 function api_suaNguoiDung(payload) {
   var session = yeuCauAdmin_(payload.token);
   var all = sheetToObjects_(SHEETS.NGUOI_DUNG);
   var target = all.filter(function (u) { return u.ID_NguoiDung === payload.idNguoiDung; })[0];
   if (!target) return errorResponse_('Không tìm thấy tài khoản', 'NOT_FOUND');
 
+  var p = payload.patch || {};
+  var vaiTroMoi = p.Vai_Tro || target.Vai_Tro;
+  var idDonViMoi = p.ID_DonVi !== undefined ? p.ID_DonVi : target.ID_DonVi;
+  if (vaiTroMoi === 'DonVi' && !idDonViMoi) {
+    return errorResponse_('Tài khoản vai trò Đơn vị phải chọn đơn vị', 'INVALID_INPUT');
+  }
+
+  // Chặn thao tác khiến hệ thống mất hết tài khoản Admin đang hoạt động.
+  var seMatQuyenAdmin = target.Vai_Tro === 'Admin' && target.Trang_Thai === 'Hoat_Dong' &&
+    ((p.Trang_Thai && p.Trang_Thai !== 'Hoat_Dong') || (p.Vai_Tro && p.Vai_Tro !== 'Admin'));
+  if (seMatQuyenAdmin && demAdminHoatDong_(target.ID_NguoiDung) < 1) {
+    return errorResponse_('Phải còn ít nhất 1 tài khoản Admin đang hoạt động', 'LAST_ADMIN');
+  }
+
+  var before = { Trang_Thai: target.Trang_Thai, Ho_Ten: target.Ho_Ten, Vai_Tro: target.Vai_Tro, ID_DonVi: target.ID_DonVi };
   var patch = {};
-  if (payload.patch && payload.patch.Trang_Thai) patch.Trang_Thai = payload.patch.Trang_Thai;
-  if (payload.patch && payload.patch.MatKhauMoi) patch.Mat_Khau_Hash = hashPassword_(payload.patch.MatKhauMoi);
+  if (p.Trang_Thai) patch.Trang_Thai = p.Trang_Thai;
+  if (p.Ho_Ten !== undefined && p.Ho_Ten !== '') patch.Ho_Ten = p.Ho_Ten;
+  if (p.Vai_Tro) {
+    patch.Vai_Tro = p.Vai_Tro;
+    patch.ID_DonVi = p.Vai_Tro === 'DonVi' ? idDonViMoi : '';
+  } else if (p.ID_DonVi !== undefined && target.Vai_Tro === 'DonVi') {
+    patch.ID_DonVi = p.ID_DonVi;
+  }
+  if (p.MatKhauMoi) patch.Mat_Khau_Hash = hashPassword_(p.MatKhauMoi);
 
   updateRow_(SHEETS.NGUOI_DUNG, target.__row, patch);
-  ghiNhatKy_('NGUOI_DUNG', target.ID_NguoiDung, 'Chinh_Sua', { Trang_Thai: target.Trang_Thai }, { Trang_Thai: patch.Trang_Thai }, session.tenDangNhap);
+  ghiNhatKy_('NGUOI_DUNG', target.ID_NguoiDung, 'Chinh_Sua', before, patch, session.tenDangNhap);
+  return okResponse_({});
+}
+
+/** Xoá hẳn 1 tài khoản. Không cho tự xoá chính mình, không cho xoá Admin hoạt động cuối cùng. */
+function api_xoaNguoiDung(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var all = sheetToObjects_(SHEETS.NGUOI_DUNG);
+  var target = all.filter(function (u) { return u.ID_NguoiDung === payload.idNguoiDung; })[0];
+  if (!target) return errorResponse_('Không tìm thấy tài khoản', 'NOT_FOUND');
+  if (target.ID_NguoiDung === session.idNguoiDung) {
+    return errorResponse_('Không thể tự xoá tài khoản đang đăng nhập', 'FORBIDDEN');
+  }
+  if (target.Vai_Tro === 'Admin' && target.Trang_Thai === 'Hoat_Dong' && demAdminHoatDong_(target.ID_NguoiDung) < 1) {
+    return errorResponse_('Phải còn ít nhất 1 tài khoản Admin đang hoạt động', 'LAST_ADMIN');
+  }
+
+  deleteRow_(SHEETS.NGUOI_DUNG, target.__row);
+  ghiNhatKy_('NGUOI_DUNG', target.ID_NguoiDung, 'Xoa', { Ten_Dang_Nhap: target.Ten_Dang_Nhap, Vai_Tro: target.Vai_Tro }, null, session.tenDangNhap);
   return okResponse_({});
 }
 

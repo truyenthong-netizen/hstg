@@ -26,7 +26,7 @@
       <h2>Bước 5 — Lập hợp đồng mới (Admin)</h2>
       <label>Tra cứu giảng viên theo CCCD *</label>
       <input id="cccd" />
-      <button onclick="traCuuGiangVien()">Tra cứu</button>
+      <button onclick="traCuuGiangVien(this)">Tra cứu</button>
       <div id="thongTinGV" style="margin-top:8px; font-size:14px;"></div>
 
       <label>Đơn vị *</label>
@@ -44,7 +44,7 @@
         <tbody id="bangGioDuKien"></tbody>
       </table>
 
-      <button onclick="taoHopDong()">Lập hợp đồng + sinh Quyết định</button>
+      <button onclick="taoHopDong(this)">Lập hợp đồng + sinh Quyết định</button>
       <div id="loi" class="error"></div>
       <div id="thanhCong" style="color:#1a7a35; margin-top:8px;"></div>
     </div>
@@ -81,7 +81,7 @@
       <label>Cấp bậc</label>
       <select id="plCapBac"><option value="DaiHoc">Đại học</option><option value="SauDaiHoc">Sau đại học</option></select>
       <label>Số giờ tăng thêm</label><input id="plSoGioTang" type="number" min="0" />
-      <button onclick="luuPhuLuc()">Lưu phụ lục</button>
+      <button onclick="luuPhuLuc(this)">Lưu phụ lục</button>
       <button class="secondary" onclick="dongPhuLuc()">Đóng</button>
       <div id="loiPhuLuc" class="error"></div>
       <div id="thanhCongPhuLuc" style="color:#1a7a35; margin-top:8px;"></div>
@@ -115,25 +115,28 @@
     }
     khoiTao();
 
-    async function traCuuGiangVien() {
+    async function traCuuGiangVien(btn) {
       const cccd = document.getElementById('cccd').value.trim();
-      try {
-        const gv = await callApi('traCuuGiangVienTheoCCCD', { soCCCD: cccd });
-        if (!gv) {
-          document.getElementById('thongTinGV').innerHTML = '<span style="color:#b00020;">Chưa có hồ sơ — tạo hồ sơ ở trang Tra cứu / Lập danh sách trước.</span>';
-          giangVienChon = null;
-          return;
+      await chayVoiNutBan(btn, 'Đang tra cứu...', async () => {
+        try {
+          const gv = await callApi('traCuuGiangVienTheoCCCD', { soCCCD: cccd });
+          if (!gv) {
+            document.getElementById('thongTinGV').innerHTML = '<span style="color:#b00020;">Chưa có hồ sơ — tạo hồ sơ ở trang Tra cứu / Lập danh sách trước.</span>';
+            giangVienChon = null;
+            return;
+          }
+          giangVienChon = gv;
+          document.getElementById('thongTinGV').innerHTML = `Đã chọn: <strong>${gv.Ho_Ten}</strong> (${gv.Hoc_Ham_Hoc_Vi})`;
+        } catch (err) {
+          document.getElementById('loi').textContent = err.message;
         }
-        giangVienChon = gv;
-        document.getElementById('thongTinGV').innerHTML = `Đã chọn: <strong>${gv.Ho_Ten}</strong> (${gv.Hoc_Ham_Hoc_Vi})`;
-      } catch (err) {
-        document.getElementById('loi').textContent = err.message;
-      }
+      });
     }
 
-    async function taoHopDong() {
+    async function taoHopDong(btn) {
       const loiEl = document.getElementById('loi');
       loiEl.textContent = '';
+      document.getElementById('thanhCong').textContent = '';
       if (!giangVienChon) { loiEl.textContent = 'Chưa chọn giảng viên hợp lệ'; return; }
 
       const chiTietGioDuKien = [];
@@ -154,14 +157,16 @@
         chiTietGioDuKien: chiTietGioDuKien,
       };
 
-      try {
-        const result = await callApi('taoHopDong', { hopDong });
-        document.getElementById('thanhCong').textContent =
-          `Đã tạo hợp đồng ${result.hopDong.Ma_So_HopDong} kèm Quyết định ${result.quyetDinh.Ma_So_QuyetDinh} (trạng thái: Dự thảo).`;
-        taiDanhSachHopDong();
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+      await chayVoiNutBan(btn, 'Đang lập hợp đồng...', async () => {
+        try {
+          const result = await callApi('taoHopDong', { hopDong });
+          document.getElementById('thanhCong').textContent =
+            `Đã tạo hợp đồng ${result.hopDong.Ma_So_HopDong} kèm Quyết định ${result.quyetDinh.Ma_So_QuyetDinh} (trạng thái: Dự thảo).`;
+          taiDanhSachHopDong();
+        } catch (err) {
+          loiEl.textContent = err.message;
+        }
+      });
     }
 
     const TEN_TRANG_THAI = {
@@ -176,9 +181,9 @@
         const list = await callApi('danhSachHopDong', { trangThai });
         document.getElementById('bangHopDong').innerHTML = list.map(hd => {
           const nutChuyenDaKy = hd.Trang_Thai === 'Du_Thao'
-            ? `<button onclick="chuyenDaKy('${hd.ID_HopDong}')">Chuyển Đã ký</button>` : '';
+            ? `<button onclick="chuyenDaKy(this, '${hd.ID_HopDong}')">Chuyển Đã ký</button>` : '';
           const nutHuy = (hd.Trang_Thai === 'Du_Thao' || hd.Trang_Thai === 'Da_Ky')
-            ? `<button class="secondary" onclick="huyHopDong('${hd.ID_HopDong}')">Huỷ</button>` : '';
+            ? `<button class="secondary" onclick="huyHopDong(this, '${hd.ID_HopDong}')">Huỷ</button>` : '';
           const nutPhuLuc = hd.Trang_Thai === 'Da_Ky'
             ? `<button class="secondary" onclick='moPhuLuc(${JSON.stringify(hd)})'>Lập phụ lục</button>` : '';
           return `
@@ -195,25 +200,31 @@
       }
     }
 
-    async function chuyenDaKy(idHopDong) {
+    async function chuyenDaKy(btn, idHopDong) {
       if (!confirm('Xác nhận chuyển hợp đồng sang trạng thái Đã ký/Có hiệu lực?')) return;
-      try {
-        await callApi('chuyenTrangThaiHopDong', { idHopDong, trangThaiMoi: 'Da_Ky' });
-        taiDanhSachHopDong();
-      } catch (err) {
-        document.getElementById('loiQuanLy').textContent = err.message;
-      }
+      document.getElementById('loiQuanLy').textContent = '';
+      await chayVoiNutBan(btn, 'Đang xử lý...', async () => {
+        try {
+          await callApi('chuyenTrangThaiHopDong', { idHopDong, trangThaiMoi: 'Da_Ky' });
+          await taiDanhSachHopDong();
+        } catch (err) {
+          document.getElementById('loiQuanLy').textContent = err.message;
+        }
+      });
     }
 
-    async function huyHopDong(idHopDong) {
+    async function huyHopDong(btn, idHopDong) {
       const lyDoHuy = prompt('Nhập lý do huỷ hợp đồng:');
       if (!lyDoHuy) return;
-      try {
-        await callApi('chuyenTrangThaiHopDong', { idHopDong, trangThaiMoi: 'Huy', lyDoHuy });
-        taiDanhSachHopDong();
-      } catch (err) {
-        document.getElementById('loiQuanLy').textContent = err.message;
-      }
+      document.getElementById('loiQuanLy').textContent = '';
+      await chayVoiNutBan(btn, 'Đang huỷ...', async () => {
+        try {
+          await callApi('chuyenTrangThaiHopDong', { idHopDong, trangThaiMoi: 'Huy', lyDoHuy });
+          await taiDanhSachHopDong();
+        } catch (err) {
+          document.getElementById('loiQuanLy').textContent = err.message;
+        }
+      });
     }
 
     let hopDongDangLapPhuLuc = null;
@@ -232,9 +243,10 @@
       hopDongDangLapPhuLuc = null;
     }
 
-    async function luuPhuLuc() {
+    async function luuPhuLuc(btn) {
       const loiEl = document.getElementById('loiPhuLuc');
       loiEl.textContent = '';
+      document.getElementById('thanhCongPhuLuc').textContent = '';
       const noiDung = document.getElementById('plNoiDung').value.trim();
       if (!noiDung) { loiEl.textContent = 'Nhập nội dung điều chỉnh'; return; }
 
@@ -253,16 +265,19 @@
         };
       }
 
-      try {
-        const result = await callApi('taoPhuLuc', { phuLuc });
-        document.getElementById('thanhCongPhuLuc').textContent = `Đã lưu phụ lục ${result.ID_PhuLuc}.`;
-        document.getElementById('plNoiDung').value = '';
-        document.getElementById('plGiaTriTruoc').value = '';
-        document.getElementById('plGiaTriSau').value = '';
-        document.getElementById('plSoGioTang').value = '';
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          const result = await callApi('taoPhuLuc', { phuLuc });
+          document.getElementById('thanhCongPhuLuc').textContent = `Đã lưu phụ lục ${result.ID_PhuLuc}.`;
+          document.getElementById('plNoiDung').value = '';
+          document.getElementById('plGiaTriTruoc').value = '';
+          document.getElementById('plGiaTriSau').value = '';
+          document.getElementById('plSoGioTang').value = '';
+          taiDanhSachHopDong();
+        } catch (err) {
+          loiEl.textContent = err.message;
+        }
+      });
     }
   </script>
 </body>

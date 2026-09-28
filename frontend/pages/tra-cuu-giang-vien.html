@@ -31,7 +31,7 @@
       <h2>Bước 1 — Tra cứu giảng viên theo CCCD</h2>
       <label>Số CCCD</label>
       <input id="cccd" type="text" maxlength="12" />
-      <button onclick="traCuu()">Tra cứu</button>
+      <button onclick="traCuu(this)">Tra cứu</button>
       <div id="loiTraCuu" class="error"></div>
     </div>
 
@@ -64,7 +64,7 @@
       <label>Ngân hàng</label><input id="tmNganHang" />
       <label>Chi nhánh</label><input id="tmChiNhanh" />
       <label>Mã số thuế</label><input id="tmMaSoThue" />
-      <button onclick="taoMoi()">Lưu hồ sơ mới</button>
+      <button onclick="taoMoi(this)">Lưu hồ sơ mới</button>
       <div id="loiTaoMoi" class="error"></div>
     </div>
 
@@ -75,7 +75,7 @@
       <label>Loại hình hoạt động</label><input id="dsLoaiHinh" />
       <label>Số tiết/số giờ dự kiến</label><input id="dsSoTiet" type="number" />
       <label>Thời gian thực hiện</label><input id="dsThoiGian" placeholder="VD: 09/2026 - 01/2027" />
-      <button onclick="luuVaoDanhSach()">Lưu vào danh sách đơn vị</button>
+      <button onclick="luuVaoDanhSach(this)">Lưu vào danh sách đơn vị</button>
       <div id="loiDanhSach" class="error"></div>
       <div id="thanhCongDanhSach" style="color:#1a7a35; margin-top:8px;"></div>
     </div>
@@ -94,7 +94,7 @@
     }
     napNamHoc();
 
-    async function traCuu() {
+    async function traCuu(btn) {
       const cccd = document.getElementById('cccd').value.trim();
       document.getElementById('loiTraCuu').textContent = '';
       document.getElementById('ketQuaCoSan').style.display = 'none';
@@ -102,25 +102,28 @@
       document.getElementById('formDanhSach').style.display = 'none';
       if (!cccd) { document.getElementById('loiTraCuu').textContent = 'Nhập số CCCD'; return; }
 
-      try {
-        const gv = await callApi('traCuuGiangVienTheoCCCD', { soCCCD: cccd });
-        if (gv) {
-          giangVienHienTai = gv;
-          document.getElementById('ktHoTen').textContent = gv.Ho_Ten;
-          document.getElementById('ktHocHam').textContent = gv.Hoc_Ham_Hoc_Vi;
-          document.getElementById('ktCccd').textContent = gv.So_CCCD;
-          document.getElementById('ketQuaCoSan').style.display = 'block';
-        } else {
-          document.getElementById('formTaoMoi').style.display = 'block';
+      await chayVoiNutBan(btn, 'Đang tra cứu...', async () => {
+        try {
+          const gv = await callApi('traCuuGiangVienTheoCCCD', { soCCCD: cccd });
+          if (gv) {
+            giangVienHienTai = gv;
+            document.getElementById('ktHoTen').textContent = gv.Ho_Ten;
+            document.getElementById('ktHocHam').textContent = gv.Hoc_Ham_Hoc_Vi;
+            document.getElementById('ktCccd').textContent = gv.So_CCCD;
+            document.getElementById('ketQuaCoSan').style.display = 'block';
+          } else {
+            document.getElementById('formTaoMoi').style.display = 'block';
+          }
+        } catch (err) {
+          document.getElementById('loiTraCuu').textContent = err.message;
         }
-      } catch (err) {
-        document.getElementById('loiTraCuu').textContent = err.message;
-      }
+      });
     }
 
-    async function taoMoi() {
+    async function taoMoi(btn) {
       const loiEl = document.getElementById('loiTaoMoi');
       loiEl.textContent = '';
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => { try {
       const giangVien = {
         So_CCCD: document.getElementById('cccd').value.trim(),
         Ho_Ten: document.getElementById('tmHoTen').value.trim(),
@@ -137,22 +140,22 @@
         Chi_Nhanh: document.getElementById('tmChiNhanh').value,
         Ma_So_Thue: document.getElementById('tmMaSoThue').value,
       };
-      try {
-        giangVienHienTai = await callApi('taoGiangVien', { giangVien });
-        document.getElementById('formTaoMoi').style.display = 'none';
-        hienThemDanhSach();
+      giangVienHienTai = await callApi('taoGiangVien', { giangVien });
+      document.getElementById('formTaoMoi').style.display = 'none';
+      hienThemDanhSach();
       } catch (err) {
         loiEl.textContent = err.message;
-      }
+      } });
     }
 
     function hienThemDanhSach() {
       document.getElementById('formDanhSach').style.display = 'block';
     }
 
-    async function luuVaoDanhSach() {
+    async function luuVaoDanhSach(btn) {
       const loiEl = document.getElementById('loiDanhSach');
       loiEl.textContent = '';
+      document.getElementById('thanhCongDanhSach').textContent = '';
       const phanCong = {
         ID_GiangVien: giangVienHienTai.ID_GiangVien,
         ID_DonVi: localStorage.getItem('idDonVi'),
@@ -163,12 +166,14 @@
         So_Tiet_So_Gio: document.getElementById('dsSoTiet').value,
         Thoi_Gian_Thuc_Hien: document.getElementById('dsThoiGian').value,
       };
-      try {
-        await callApi('themVaoDanhSach', { phanCong });
-        document.getElementById('thanhCongDanhSach').textContent = 'Đã thêm vào danh sách của đơn vị.';
-      } catch (err) {
-        loiEl.textContent = err.message;
-      }
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('themVaoDanhSach', { phanCong });
+          document.getElementById('thanhCongDanhSach').textContent = 'Đã thêm vào danh sách của đơn vị.';
+        } catch (err) {
+          loiEl.textContent = err.message;
+        }
+      });
     }
   </script>
 </body>
