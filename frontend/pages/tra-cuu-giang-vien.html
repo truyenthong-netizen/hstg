@@ -73,8 +73,13 @@
       <label>Môn học/học phần *</label><input id="dsMonHoc" />
       <label>Học kỳ</label><input id="dsHocKy" />
       <label>Loại hình hoạt động</label><input id="dsLoaiHinh" />
-      <label>Số tiết/số giờ dự kiến</label><input id="dsSoTiet" type="number" />
       <label>Thời gian thực hiện</label><input id="dsThoiGian" placeholder="VD: 09/2026 - 01/2027" />
+
+      <h3 style="margin-top:16px;">Giờ chuẩn quy đổi dự kiến (điền được luôn ở đây — không bắt buộc, có thể bổ sung/sửa sau ở trang Danh sách đơn vị)</h3>
+      <label>Giờ chuẩn giảng dạy Đại học</label><input id="dsGioDaiHoc" type="number" min="0" value="0" />
+      <label>Giờ chuẩn giảng dạy Sau đại học</label><input id="dsGioSauDaiHoc" type="number" min="0" value="0" />
+      <label>Giờ chuẩn Nghiên cứu khoa học</label><input id="dsGioNCKH" type="number" min="0" value="0" />
+
       <button onclick="luuVaoDanhSach(this)">Lưu vào danh sách đơn vị</button>
       <div id="loiDanhSach" class="error"></div>
       <div id="thanhCongDanhSach" style="color:#1a7a35; margin-top:8px;"></div>
@@ -163,13 +168,16 @@
         Mon_Hoc_HocPhan: document.getElementById('dsMonHoc').value,
         Hoc_Ky: document.getElementById('dsHocKy').value,
         Loai_Hinh_HD: document.getElementById('dsLoaiHinh').value,
-        So_Tiet_So_Gio: document.getElementById('dsSoTiet').value,
         Thoi_Gian_Thuc_Hien: document.getElementById('dsThoiGian').value,
+        gioChuanDaiHoc: document.getElementById('dsGioDaiHoc').value,
+        gioChuanSauDaiHoc: document.getElementById('dsGioSauDaiHoc').value,
+        gioChuanNCKH: document.getElementById('dsGioNCKH').value,
       };
       await chayVoiNutBan(btn, 'Đang lưu...', async () => {
         try {
           await callApi('themVaoDanhSach', { phanCong });
-          document.getElementById('thanhCongDanhSach').textContent = 'Đã thêm vào danh sách của đơn vị.';
+          document.getElementById('thanhCongDanhSach').textContent =
+            'Đã thêm vào danh sách của đơn vị — giờ dự kiến đã nhập ở đây hiện ngay ở trang Danh sách đơn vị, có thể bấm "Nhập giờ" để sửa lại nếu cần.';
         } catch (err) {
           loiEl.textContent = err.message;
         }
