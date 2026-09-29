@@ -43,6 +43,15 @@
         <tr><td>CCCD</td><td id="ktCccd"></td></tr>
       </table>
       <button onclick="hienThemDanhSach()">Chọn hồ sơ này → thêm vào danh sách đơn vị</button>
+
+      <h3 style="margin-top:16px;">Bổ sung thông tin phục vụ xuất hợp đồng (nếu hồ sơ chưa có — không bắt buộc để lập danh sách, nhưng cần có trước khi Admin xuất file Word/PDF)</h3>
+      <label>Chức vụ/chức danh</label><input id="btChucVu" placeholder="VD: Trưởng khoa, Giảng viên..." />
+      <label>Điện thoại cơ quan/đơn vị</label><input id="btDienThoaiCoQuan" />
+      <label>Ngày cấp CCCD</label><input id="btNgayCapCCCD" type="date" />
+      <label>Nơi cấp CCCD</label><input id="btNoiCapCCCD" placeholder="VD: Cục Cảnh sát QLHC về TTXH" />
+      <button onclick="boSungThongTin(this)">Lưu bổ sung</button>
+      <div id="loiBoSung" class="error"></div>
+      <div id="thanhCongBoSung" style="color:#1a7a35; margin-top:8px;"></div>
     </div>
 
     <div class="card" id="formTaoMoi" style="display:none;">
@@ -64,6 +73,10 @@
       <label>Ngân hàng</label><input id="tmNganHang" />
       <label>Chi nhánh</label><input id="tmChiNhanh" />
       <label>Mã số thuế</label><input id="tmMaSoThue" />
+      <label>Chức vụ/chức danh</label><input id="tmChucVu" placeholder="VD: Trưởng khoa, Giảng viên..." />
+      <label>Điện thoại cơ quan/đơn vị</label><input id="tmDienThoaiCoQuan" />
+      <label>Ngày cấp CCCD</label><input id="tmNgayCapCCCD" type="date" />
+      <label>Nơi cấp CCCD</label><input id="tmNoiCapCCCD" placeholder="VD: Cục Cảnh sát QLHC về TTXH" />
       <button onclick="taoMoi(this)">Lưu hồ sơ mới</button>
       <div id="loiTaoMoi" class="error"></div>
     </div>
@@ -115,6 +128,12 @@
             document.getElementById('ktHoTen').textContent = gv.Ho_Ten;
             document.getElementById('ktHocHam').textContent = gv.Hoc_Ham_Hoc_Vi;
             document.getElementById('ktCccd').textContent = gv.So_CCCD;
+            document.getElementById('btChucVu').value = gv.Chuc_Vu_Chuc_Danh || '';
+            document.getElementById('btDienThoaiCoQuan').value = gv.Dien_Thoai_Co_Quan || '';
+            document.getElementById('btNgayCapCCCD').value = gv.Ngay_Cap_CCCD || '';
+            document.getElementById('btNoiCapCCCD').value = gv.Noi_Cap_CCCD || '';
+            document.getElementById('loiBoSung').textContent = '';
+            document.getElementById('thanhCongBoSung').textContent = '';
             document.getElementById('ketQuaCoSan').style.display = 'block';
           } else {
             document.getElementById('formTaoMoi').style.display = 'block';
@@ -144,6 +163,10 @@
         Ngan_Hang: document.getElementById('tmNganHang').value,
         Chi_Nhanh: document.getElementById('tmChiNhanh').value,
         Ma_So_Thue: document.getElementById('tmMaSoThue').value,
+        Chuc_Vu_Chuc_Danh: document.getElementById('tmChucVu').value,
+        Dien_Thoai_Co_Quan: document.getElementById('tmDienThoaiCoQuan').value,
+        Ngay_Cap_CCCD: document.getElementById('tmNgayCapCCCD').value,
+        Noi_Cap_CCCD: document.getElementById('tmNoiCapCCCD').value,
       };
       giangVienHienTai = await callApi('taoGiangVien', { giangVien });
       document.getElementById('formTaoMoi').style.display = 'none';
@@ -155,6 +178,28 @@
 
     function hienThemDanhSach() {
       document.getElementById('formDanhSach').style.display = 'block';
+    }
+
+    async function boSungThongTin(btn) {
+      const loiEl = document.getElementById('loiBoSung');
+      const okEl = document.getElementById('thanhCongBoSung');
+      loiEl.textContent = '';
+      okEl.textContent = '';
+      if (!giangVienHienTai) { loiEl.textContent = 'Chưa có hồ sơ giảng viên'; return; }
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          await callApi('boSungThongTinGiangVien', {
+            idGiangVien: giangVienHienTai.ID_GiangVien,
+            Chuc_Vu_Chuc_Danh: document.getElementById('btChucVu').value,
+            Dien_Thoai_Co_Quan: document.getElementById('btDienThoaiCoQuan').value,
+            Ngay_Cap_CCCD: document.getElementById('btNgayCapCCCD').value,
+            Noi_Cap_CCCD: document.getElementById('btNoiCapCCCD').value,
+          });
+          okEl.textContent = 'Đã lưu bổ sung vào hồ sơ giảng viên.';
+        } catch (err) {
+          loiEl.textContent = err.message;
+        }
+      });
     }
 
     async function luuVaoDanhSach(btn) {
