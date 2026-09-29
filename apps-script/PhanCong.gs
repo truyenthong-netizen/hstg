@@ -3,6 +3,14 @@
  * Theo Mục 9.3 tài liệu YCNV.
  */
 
+/**
+ * payload.phanCong: { ID_GiangVien, ID_DonVi, ID_NamHoc, Mon_Hoc_HocPhan, Hoc_Ky, Loai_Hinh_HD,
+ *   Thoi_Gian_Thuc_Hien, gioChuanDaiHoc, gioChuanSauDaiHoc, gioChuanNCKH }
+ * Từ bản gộp Bước 3+4 (4/2026): nhập luôn giờ chuẩn quy đổi (Đại học/Sau đại học/NCKH) ngay
+ * lúc lập danh sách, KHÔNG bắt đơn vị phải quay lại trang Danh sách đơn vị bấm "Nhập giờ" một
+ * lần nữa mới thấy số — dòng vừa lập đã hiện đúng giờ dự kiến ngay. Vẫn có thể sửa lại sau ở
+ * trang Danh sách đơn vị (api_capNhatGioDuKien) nếu cần điều chỉnh.
+ */
 function api_themVaoDanhSach(payload) {
   var session = yeuCauDangNhap_(payload.token);
   var d = payload.phanCong || {};
@@ -16,23 +24,39 @@ function api_themVaoDanhSach(payload) {
     return errorResponse_('Không có quyền lập danh sách cho đơn vị khác', 'FORBIDDEN');
   }
 
-  var record = {
-    ID_PhanCong: newId_('PC'),
-    ID_GiangVien: d.ID_GiangVien,
-    ID_DonVi: d.ID_DonVi,
-    ID_NamHoc: d.ID_NamHoc,
-    Mon_Hoc_HocPhan: d.Mon_Hoc_HocPhan,
-    Hoc_Ky: d.Hoc_Ky || '',
-    Loai_Hinh_HD: d.Loai_Hinh_HD || '',
-    So_Tiet_So_Gio: d.So_Tiet_So_Gio || 0,
-    Thoi_Gian_Thuc_Hien: d.Thoi_Gian_Thuc_Hien || '',
-    Trang_Thai: 'Du_Kien',
-    Nguoi_Lap: session.tenDangNhap,
-    Ngay_Lap: todayStr_(),
-  };
-  appendRow_(SHEETS.PHAN_CONG_THINH_GIANG, record);
-  ghiNhatKy_('PHAN_CONG_THINH_GIANG', record.ID_PhanCong, 'Tao_Moi', null, record, session.tenDangNhap);
-  return okResponse_(record);
+  return withLock_(function () {
+    var record = {
+      ID_PhanCong: newId_('PC'),
+      ID_GiangVien: d.ID_GiangVien,
+      ID_DonVi: d.ID_DonVi,
+      ID_NamHoc: d.ID_NamHoc,
+      Mon_Hoc_HocPhan: d.Mon_Hoc_HocPhan,
+      Hoc_Ky: d.Hoc_Ky || '',
+      Loai_Hinh_HD: d.Loai_Hinh_HD || '',
+      So_Tiet_So_Gio: 0, // không còn dùng — giờ chuẩn quy đổi lấy đủ ở CHI_TIET_GIO_GIANG bên dưới
+      Thoi_Gian_Thuc_Hien: d.Thoi_Gian_Thuc_Hien || '',
+      Trang_Thai: 'Du_Kien',
+      Nguoi_Lap: session.tenDangNhap,
+      Ngay_Lap: todayStr_(),
+    };
+    appendRow_(SHEETS.PHAN_CONG_THINH_GIANG, record);
+    ghiNhatKy_('PHAN_CONG_THINH_GIANG', record.ID_PhanCong, 'Tao_Moi', null, record, session.tenDangNhap);
+
+    [
+      { capBac: 'DaiHoc', soGio: d.gioChuanDaiHoc },
+      { capBac: 'SauDaiHoc', soGio: d.gioChuanSauDaiHoc },
+      { capBac: 'NCKH', soGio: d.gioChuanNCKH },
+    ].forEach(function (m) {
+      if (Number(m.soGio) > 0) ghiChiTietGio_('PhanCong', record.ID_PhanCong, m.capBac, m.soGio);
+    });
+    if (Number(d.gioChuanDaiHoc) > 0 || Number(d.gioChuanSauDaiHoc) > 0 || Number(d.gioChuanNCKH) > 0) {
+      ghiNhatKy_('PHAN_CONG_THINH_GIANG', record.ID_PhanCong, 'Cap_Nhat_Gio_Du_Kien', null, {
+        gioChuanDaiHoc: d.gioChuanDaiHoc, gioChuanSauDaiHoc: d.gioChuanSauDaiHoc, gioChuanNCKH: d.gioChuanNCKH,
+      }, session.tenDangNhap);
+    }
+
+    return okResponse_(record);
+  });
 }
 
 /** Bước 4 (dữ liệu nguồn để xuất danh sách): lấy danh sách của 1 đơn vị + năm học, kèm tên giảng viên. */
@@ -106,18 +130,28 @@ function api_capNhatGioDuKien(payload) {
 }
 
 /**
- * Admin: tìm dòng danh sách (đơn vị đã lập) khớp đúng giảng viên + đơn vị + năm học,
- * kèm giờ dự kiến đơn vị đã nhập qua Excel — dùng để lập hợp đồng ở Bước 5.
- * Trả về null nếu đơn vị chưa lập danh sách cho giảng viên này trong năm học đó.
+ * Admin: tìm TẤT CẢ dòng danh sách (ở MỌI đơn vị) khớp giảng viên + năm học, kèm giờ dự
+ * kiến từng dòng — dùng để lập hợp đồng tổng thể ở Bước 5. Từ bản gộp hợp đồng (4/2026):
+ * 1 giảng viên có thể được nhiều đơn vị lập danh sách trong cùng năm học, nhưng CHỈ được
+ * gộp chung vào 1 hợp đồng duy nhất (không còn tách hợp đồng theo từng đơn vị).
+ * Trả về mảng rỗng nếu chưa đơn vị nào lập danh sách cho giảng viên này trong năm học đó.
  */
 function api_timPhanCongTheoGiangVien(payload) {
   yeuCauAdmin_(payload.token);
-  var pc = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (r) {
-    return r.ID_GiangVien === payload.idGiangVien && r.ID_DonVi === payload.idDonVi && r.ID_NamHoc === payload.idNamHoc;
-  })[0];
-  if (!pc) return okResponse_(null);
-  var chiTietGio = layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong);
-  return okResponse_({ phanCong: pc, chiTietGio: chiTietGio });
+  var dsPhanCong = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (r) {
+    return r.ID_GiangVien === payload.idGiangVien && r.ID_NamHoc === payload.idNamHoc;
+  });
+  var dvMap = {};
+  sheetToObjects_(SHEETS.DON_VI).forEach(function (dv) { dvMap[dv.ID_DonVi] = dv; });
+
+  var result = dsPhanCong.map(function (pc) {
+    return {
+      phanCong: pc,
+      Ten_DonVi: (dvMap[pc.ID_DonVi] || {}).Ten_DonVi || pc.ID_DonVi,
+      chiTietGio: layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong),
+    };
+  });
+  return okResponse_(result);
 }
 
 // TODO Bước 4 — Xuất trình ký PDF: xuất Word/PDF bằng Google Docs template (xem ExportUtils.gs)

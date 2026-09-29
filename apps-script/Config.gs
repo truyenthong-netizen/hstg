@@ -65,6 +65,10 @@ var SCHEMA = {
     'Nguoi_Tao', 'Ngay_Tao', 'Ngay_Ky',
   ],
   // Trang_Thai: 'Du_Thao' | 'Da_Ky' | 'Da_Thanh_Ly' | 'Huy'
+  // Từ bản gộp hợp đồng (4/2026): 1 giảng viên = ĐÚNG 1 hợp đồng / năm học, dù được nhiều
+  // đơn vị mời giảng. Vì vậy ID_DonVi và ID_PhanCong ở đây lưu DANH SÁCH id cách nhau bởi
+  // dấu phẩy (không đổi tên cột để khỏi phải sửa header trên Sheet) — xem dsIdTuChuoi_,
+  // coId_ trong Utils.gs và api_taoHopDong trong HopDong.gs.
 
   QUYET_DINH_HOP_DONG: [
     'ID_QuyetDinh', 'Ma_So_QuyetDinh', 'ID_HopDong', 'Trich_Yeu',

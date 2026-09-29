@@ -23,7 +23,7 @@ function api_taoGiayXacNhan(payload) {
 
   var hopDong = sheetToObjects_(SHEETS.HOP_DONG).filter(function (hd) { return hd.ID_HopDong === d.ID_HopDong; })[0];
   if (!hopDong) return errorResponse_('Không tìm thấy hợp đồng', 'NOT_FOUND');
-  if (session.vaiTro === 'DonVi' && hopDong.ID_DonVi !== session.idDonVi) {
+  if (session.vaiTro === 'DonVi' && !coId_(hopDong.ID_DonVi, session.idDonVi)) {
     return errorResponse_('Không có quyền lập giấy xác nhận cho hợp đồng đơn vị khác', 'FORBIDDEN');
   }
 

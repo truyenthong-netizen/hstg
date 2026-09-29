@@ -47,7 +47,7 @@ function api_thanhLyHopDong(payload) {
   var session = yeuCauDangNhap_(payload.token);
   var hopDong = sheetToObjects_(SHEETS.HOP_DONG).filter(function (hd) { return hd.ID_HopDong === payload.idHopDong; })[0];
   if (!hopDong) return errorResponse_('Không tìm thấy hợp đồng', 'NOT_FOUND');
-  if (session.vaiTro === 'DonVi' && hopDong.ID_DonVi !== session.idDonVi) {
+  if (session.vaiTro === 'DonVi' && !coId_(hopDong.ID_DonVi, session.idDonVi)) {
     return errorResponse_('Không có quyền thanh lý hợp đồng đơn vị khác', 'FORBIDDEN');
   }
   if (hopDong.Trang_Thai !== 'Da_Ky') {

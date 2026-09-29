@@ -73,6 +73,33 @@ function deleteRow_(sheetName, rowIndex) {
   sh.deleteRow(rowIndex);
 }
 
+/**
+ * Từ bản 4/2026: 1 hợp đồng có thể gộp nhiều đơn vị (1 giảng viên = 1 hợp đồng/năm học,
+ * không tách theo từng đơn vị nữa — xem HopDong.gs). Cột HOP_DONG.ID_DonVi và
+ * HOP_DONG.ID_PhanCong vì vậy lưu DANH SÁCH id cách nhau bởi dấu phẩy thay vì 1 id đơn.
+ * 3 hàm dưới đây dùng chung để đọc/ghi/so khớp danh sách đó.
+ */
+function dsIdTuChuoi_(csv) {
+  return String(csv || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+}
+
+function ghepDsId_(mangId) {
+  return uniq_(mangId).join(',');
+}
+
+function coId_(csv, id) {
+  return dsIdTuChuoi_(csv).indexOf(id) !== -1;
+}
+
+function uniq_(mang) {
+  var seen = {};
+  var out = [];
+  (mang || []).forEach(function (v) {
+    if (v && !seen[v]) { seen[v] = true; out.push(v); }
+  });
+  return out;
+}
+
 /** Sinh ID nội bộ dạng chuỗi ngẫu nhiên ngắn (không phải mã hiển thị cho người dùng). */
 function newId_(prefix) {
   return (prefix || 'ID') + '_' + Utilities.getUuid().split('-')[0];

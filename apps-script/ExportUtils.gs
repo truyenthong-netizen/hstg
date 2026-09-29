@@ -9,6 +9,9 @@
  */
 
 var TEMPLATE_DOC_IDS = {
+  // Mẫu BM-HĐTG-45 (file "BM.2025-TCCB-HĐTG-45.0.docx" người dùng cung cấp) — đã chuyển
+  // sẵn placeholder dạng {{TenTruong}} vào đúng vị trí (xem BM-HDTG-45_mau_co_placeholder.docx
+  // đã gửi kèm). Điền ID Google Doc sau khi tải file đó lên Drive và mở bằng Google Docs.
   HOP_DONG: 'PUT_GOOGLE_DOC_TEMPLATE_ID_HOP_DONG',
   QUYET_DINH: 'PUT_GOOGLE_DOC_TEMPLATE_ID_QUYET_DINH',
   GIAY_XAC_NHAN: 'PUT_GOOGLE_DOC_TEMPLATE_ID_GCN',
@@ -16,6 +19,14 @@ var TEMPLATE_DOC_IDS = {
 };
 
 var EXPORT_FOLDER_ID = 'PUT_GOOGLE_DRIVE_FOLDER_ID_DE_LUU_FILE_XUAT_RA';
+
+/** Đổi 'yyyy-mm-dd' (input type=date của trình duyệt) sang 'dd/mm/yyyy' để hiển thị đúng văn phong hợp đồng. */
+function formatNgayVN_(yyyyMmDd) {
+  if (!yyyyMmDd) return '';
+  var p = String(yyyyMmDd).split('-');
+  if (p.length !== 3) return String(yyyyMmDd);
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
 
 /**
  * Hàm dùng chung: copy template, thay placeholder, xuất PDF.
@@ -38,24 +49,56 @@ function xuatPdfTuTemplate_(templateId, placeholders, tenFileMoi) {
   return pdfFile.getUrl();
 }
 
-/** Bước 5: xuất file hợp đồng đã điền sẵn thông tin giảng viên (mail-merge tự động). */
+/**
+ * Bước 5: xuất file hợp đồng theo đúng mẫu BM-HĐTG-45 (mail-merge tự động toàn bộ các
+ * trường hệ thống đã có sẵn). Các trường KHÔNG có trong dữ liệu hệ thống (đại diện Bên A,
+ * số/ngày giấy ủy quyền, nơi sinh, nơi cấp CCCD, điện thoại cơ quan...) để trống trong file
+ * xuất ra — vẫn đúng như quy trình cũ, Phòng TCCB điền tay các mục này khi trình ký.
+ */
 function api_xuatFileHopDong(payload) {
   yeuCauAdmin_(payload.token);
   var hopDong = sheetToObjects_(SHEETS.HOP_DONG).filter(function (hd) { return hd.ID_HopDong === payload.idHopDong; })[0];
   if (!hopDong) return errorResponse_('Không tìm thấy hợp đồng', 'NOT_FOUND');
   var gv = sheetToObjects_(SHEETS.GIANG_VIEN).filter(function (g) { return g.ID_GiangVien === hopDong.ID_GiangVien; })[0];
+  if (!gv) return errorResponse_('Không tìm thấy hồ sơ giảng viên', 'NOT_FOUND');
+  var namHoc = sheetToObjects_(SHEETS.NAM_HOC).filter(function (nh) { return nh.ID_NamHoc === hopDong.ID_NamHoc; })[0];
 
-  // TODO: bổ sung đầy đủ placeholder khớp mẫu BM-HĐTG-45 thật (xem file gốc người dùng cung cấp).
+  var gioHopDong = {};
+  layChiTietTheoThamChieu_('HopDong', hopDong.ID_HopDong).forEach(function (ct) {
+    gioHopDong[ct.Cap_Bac] = (gioHopDong[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+  });
+  var gDaiHoc = gioHopDong.DaiHoc || 0, gSauDaiHoc = gioHopDong.SauDaiHoc || 0, gNCKH = gioHopDong.NCKH || 0;
+  var ngayLap = new Date();
+
   var placeholders = {
+    // Bên B — lấy đủ từ hồ sơ giảng viên đã lưu.
+    '{{HocHamHocVi}}': gv.Hoc_Ham_Hoc_Vi,
     '{{HoTen}}': gv.Ho_Ten,
-    '{{NgaySinh}}': gv.Ngay_Sinh,
-    '{{SoCCCD}}': gv.So_CCCD,
+    '{{NgaySinh}}': formatNgayVN_(gv.Ngay_Sinh),
+    '{{TrinhDo}}': gv.Hoc_Ham_Hoc_Vi,
+    '{{ChuyenNganh}}': gv.Chuyen_Nganh,
     '{{DiaChi}}': gv.Dia_Chi,
+    '{{SoDienThoai}}': gv.So_Dien_Thoai,
+    '{{SoCCCD}}': gv.So_CCCD,
     '{{SoTaiKhoan}}': gv.So_Tai_Khoan,
     '{{NganHang}}': gv.Ngan_Hang,
     '{{ChiNhanh}}': gv.Chi_Nhanh,
     '{{MaSoThue}}': gv.Ma_So_Thue,
+    // Không có trong dữ liệu hệ thống — để trống, điền tay khi trình ký.
+    '{{NoiSinh}}': '', '{{DienThoaiCoQuan}}': '', '{{NgayCapCCCD}}': '', '{{NoiCapCCCD}}': '',
+    '{{NguoiDaiDienBenA}}': '', '{{ChucVuDaiDienBenA}}': '', '{{SoGiayUyQuyen}}': '', '{{NgayGiayUyQuyen}}': '',
+    // Hợp đồng.
     '{{MaSoHopDong}}': hopDong.Ma_So_HopDong,
+    '{{TenNamHoc}}': namHoc ? namHoc.Ten_NamHoc : '',
+    '{{NgayLap_Ngay}}': ngayLap.getDate(),
+    '{{NgayLap_Thang}}': ngayLap.getMonth() + 1,
+    '{{NgayLap_Nam}}': ngayLap.getFullYear(),
+    '{{TuNgay}}': formatNgayVN_(hopDong.Tu_Ngay),
+    '{{DenNgay}}': formatNgayVN_(hopDong.Den_Ngay),
+    '{{TongSoGio}}': gDaiHoc + gSauDaiHoc + gNCKH,
+    '{{SoGioDaiHoc}}': gDaiHoc,
+    '{{SoGioSauDaiHoc}}': gSauDaiHoc,
+    '{{SoGioNCKH}}': gNCKH,
     '{{NoiDungGiangDay}}': hopDong.Noi_Dung_Giang_Day,
   };
 
@@ -64,7 +107,8 @@ function api_xuatFileHopDong(payload) {
 }
 
 // TODO: viết tương tự api_xuatFileQuyetDinh, api_xuatFileGiayXacNhan, api_xuatBienBanThanhLy
-// (cấu trúc giống hệt api_xuatFileHopDong ở trên, khác template + danh sách placeholder).
+// (cấu trúc giống hệt api_xuatFileHopDong ở trên, khác template + danh sách placeholder) —
+// cần thêm mẫu Quyết định/GCN/Thanh lý dạng .docx thật để làm tương tự.
 
 /** Bước 4: xuất danh sách giảng viên của đơn vị ra Google Sheet mới (đơn giản hơn PDF). */
 function api_xuatDanhSachExcel(payload) {
