@@ -10,7 +10,7 @@
 
 // ID của Google Spreadsheet dùng làm CSDL. Điền sau khi tạo Sheet trống.
 // Cách lấy: mở Google Sheet -> copy chuỗi giữa /d/ và /edit trên URL.
-var SPREADSHEET_ID = '1UNFZcqaetDKbJ0Lsd31vQ0mPwLDu1h8foQ9xMx_rqnM';
+var SPREADSHEET_ID = '1rQi3MrU8kAG_9OH7WfD_9hNFL80Zc-Pe2Zw-z8yJVOY';
 
 function getDb_() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
