@@ -5,4 +5,4 @@ compatibility_date = "2024-01-01"
 # Điền URL Web App Apps Script sau khi deploy (Bước 3 trong docs/DEPLOY.md).
 # Có thể đặt qua lệnh: wrangler secret put APPS_SCRIPT_URL
 [vars]
-APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwew-5TDEAAeG71HjoLnW5ae6UY6FhIwfHvK1QxeA0Z1YujhpCXC68qUxh4-VR9HYs/exec"
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3YbVLWJXrMY1tYYUiwEL4k4LB8Cw8K0lfVna0YbScgeL84Y-k6IMhTHoKHBKw3err4A/exec"
