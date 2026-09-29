@@ -40,6 +40,7 @@ var ACTION_MAP = {
   taoGiangVien: api_taoGiangVien,
   suaGiangVien: api_suaGiangVien,
   layGiangVienTheoId: api_layGiangVienTheoId,
+  boSungThongTinGiangVien: api_boSungThongTinGiangVien,
 
   // Danh sách thỉnh giảng của đơn vị
   themVaoDanhSach: api_themVaoDanhSach,

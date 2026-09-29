@@ -9,6 +9,9 @@
  */
 
 var TEMPLATE_DOC_IDS = {
+  // Mẫu BM-HĐTG-45 (file "BM.2025-TCCB-HĐTG-45.0.docx" người dùng cung cấp) — đã chuyển
+  // sẵn placeholder dạng {{TenTruong}} vào đúng vị trí (xem BM-HDTG-45_mau_co_placeholder.docx
+  // đã gửi kèm). Điền ID Google Doc sau khi tải file đó lên Drive và mở bằng Google Docs.
   HOP_DONG: '14MEU6Tz6qxaWgQhLUoqJk-NosgXkCB4nq2eQjfC0JPA',
   QUYET_DINH: 'PUT_GOOGLE_DOC_TEMPLATE_ID_QUYET_DINH',
   GIAY_XAC_NHAN: 'PUT_GOOGLE_DOC_TEMPLATE_ID_GCN',
@@ -27,11 +30,21 @@ var DAI_DIEN_BEN_A = {
   ngayGiayUyQuyen: '13/7/2026',
 };
 
-/** Đổi 'yyyy-mm-dd' (input type=date của trình duyệt) sang 'dd/mm/yyyy' để hiển thị đúng văn phong hợp đồng. */
-function formatNgayVN_(yyyyMmDd) {
-  if (!yyyyMmDd) return '';
-  var p = String(yyyyMmDd).split('-');
-  if (p.length !== 3) return String(yyyyMmDd);
+/**
+ * Đổi ngày sang 'dd/mm/yyyy' để hiển thị đúng văn phong hợp đồng.
+ * Nhận cả 2 dạng: chuỗi 'yyyy-mm-dd' (input type=date của trình duyệt) VÀ đối tượng Date
+ * (Sheets tự trả cột ngày dạng Date khi đọc bằng Apps Script, ví dụ cột Ngay_Sinh của
+ * GIANG_VIEN) — thiếu nhánh Date là nguyên nhân "Sinh ngày" từng in ra nguyên chuỗi
+ * "Mon Jan 01 1990 00:00:00 GMT+0700 ..." thay vì "01/01/1990".
+ */
+function formatNgayVN_(value) {
+  if (!value) return '';
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    var d = value.getDate(), m = value.getMonth() + 1, y = value.getFullYear();
+    return (d < 10 ? '0' : '') + d + '/' + (m < 10 ? '0' : '') + m + '/' + y;
+  }
+  var p = String(value).split('-');
+  if (p.length !== 3) return String(value);
   return p[2] + '/' + p[1] + '/' + p[0];
 }
 
@@ -47,7 +60,12 @@ function xuatPdfTuTemplate_(templateId, placeholders, tenFileMoi) {
   var body = doc.getBody();
 
   Object.keys(placeholders).forEach(function (key) {
-    body.replaceText(key.replace(/[{}]/g, '\\$&'), String(placeholders[key] || ''));
+    // Lưu ý: dùng "|| ''" ở đây từng là bug — số 0 (ví dụ 0 giờ NCKH) bị coi là "rỗng"
+    // nên bị xoá mất luôn số 0 thay vì hiển thị "0". Chỉ thay bằng rỗng khi thật sự là
+    // undefined/null/chuỗi rỗng.
+    var gtri = placeholders[key];
+    var text = (gtri === undefined || gtri === null || gtri === '') ? '' : String(gtri);
+    body.replaceText(key.replace(/[{}]/g, '\\$&'), text);
   });
   doc.saveAndClose();
 
@@ -58,9 +76,10 @@ function xuatPdfTuTemplate_(templateId, placeholders, tenFileMoi) {
 
 /**
  * Bước 5: xuất file hợp đồng theo đúng mẫu BM-HĐTG-45 (mail-merge tự động toàn bộ các
- * trường hệ thống đã có sẵn). Các trường KHÔNG có trong dữ liệu hệ thống (đại diện Bên A,
- * số/ngày giấy ủy quyền, nơi sinh, nơi cấp CCCD, điện thoại cơ quan...) để trống trong file
- * xuất ra — vẫn đúng như quy trình cũ, Phòng TCCB điền tay các mục này khi trình ký.
+ * trường hệ thống đã có sẵn, gồm cả Chức vụ/chức danh, Điện thoại cơ quan, Ngày/Nơi cấp CCCD
+ * — 4/2026: đã thêm vào hồ sơ giảng viên, xem GiangVien.gs/api_boSungThongTinGiangVien).
+ * Chỉ còn "Nơi sinh" là chưa có trường tương ứng trong hệ thống nên vẫn để trống trong file
+ * xuất ra, Phòng TCCB điền tay khi trình ký.
  */
 function api_xuatFileHopDong(payload) {
   yeuCauAdmin_(payload.token);
@@ -78,6 +97,7 @@ function api_xuatFileHopDong(payload) {
   var ngayLap = new Date();
 
   var placeholders = {
+    // Bên B — lấy đủ từ hồ sơ giảng viên đã lưu.
     '{{HocHamHocVi}}': gv.Hoc_Ham_Hoc_Vi,
     '{{HoTen}}': gv.Ho_Ten,
     '{{NgaySinh}}': formatNgayVN_(gv.Ngay_Sinh),
@@ -90,11 +110,18 @@ function api_xuatFileHopDong(payload) {
     '{{NganHang}}': gv.Ngan_Hang,
     '{{ChiNhanh}}': gv.Chi_Nhanh,
     '{{MaSoThue}}': gv.Ma_So_Thue,
-    '{{NoiSinh}}': '', '{{DienThoaiCoQuan}}': '', '{{NgayCapCCCD}}': '', '{{NoiCapCCCD}}': '',
+    '{{ChucVuChucDanh}}': gv.Chuc_Vu_Chuc_Danh,
+    '{{DienThoaiCoQuan}}': gv.Dien_Thoai_Co_Quan,
+    '{{NgayCapCCCD}}': formatNgayVN_(gv.Ngay_Cap_CCCD),
+    '{{NoiCapCCCD}}': gv.Noi_Cap_CCCD,
+    // Nơi sinh: vẫn chưa có trường tương ứng trong hồ sơ giảng viên — để trống, điền tay khi trình ký.
+    '{{NoiSinh}}': '',
+    // Bên A — lấy theo Giấy ủy quyền hiện hành (xem DAI_DIEN_BEN_A ở đầu file).
     '{{NguoiDaiDienBenA}}': DAI_DIEN_BEN_A.hoTen,
     '{{ChucVuDaiDienBenA}}': DAI_DIEN_BEN_A.chucVu,
     '{{SoGiayUyQuyen}}': DAI_DIEN_BEN_A.soGiayUyQuyen,
     '{{NgayGiayUyQuyen}}': DAI_DIEN_BEN_A.ngayGiayUyQuyen,
+    // Hợp đồng.
     '{{MaSoHopDong}}': hopDong.Ma_So_HopDong,
     '{{TenNamHoc}}': namHoc ? namHoc.Ten_NamHoc : '',
     '{{NgayLap_Ngay}}': ngayLap.getDate(),
