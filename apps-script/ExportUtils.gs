@@ -9,9 +9,6 @@
  */
 
 var TEMPLATE_DOC_IDS = {
-  // Mẫu BM-HĐTG-45 (file "BM.2025-TCCB-HĐTG-45.0.docx" người dùng cung cấp) — đã chuyển
-  // sẵn placeholder dạng {{TenTruong}} vào đúng vị trí (xem BM-HDTG-45_mau_co_placeholder.docx
-  // đã gửi kèm). Điền ID Google Doc sau khi tải file đó lên Drive và mở bằng Google Docs.
   HOP_DONG: '14MEU6Tz6qxaWgQhLUoqJk-NosgXkCB4nq2eQjfC0JPA',
   QUYET_DINH: 'PUT_GOOGLE_DOC_TEMPLATE_ID_QUYET_DINH',
   GIAY_XAC_NHAN: 'PUT_GOOGLE_DOC_TEMPLATE_ID_GCN',
@@ -81,7 +78,6 @@ function api_xuatFileHopDong(payload) {
   var ngayLap = new Date();
 
   var placeholders = {
-    // Bên B — lấy đủ từ hồ sơ giảng viên đã lưu.
     '{{HocHamHocVi}}': gv.Hoc_Ham_Hoc_Vi,
     '{{HoTen}}': gv.Ho_Ten,
     '{{NgaySinh}}': formatNgayVN_(gv.Ngay_Sinh),
@@ -94,14 +90,11 @@ function api_xuatFileHopDong(payload) {
     '{{NganHang}}': gv.Ngan_Hang,
     '{{ChiNhanh}}': gv.Chi_Nhanh,
     '{{MaSoThue}}': gv.Ma_So_Thue,
-    // Không có trong dữ liệu hệ thống (hồ sơ giảng viên) — để trống, điền tay khi trình ký.
     '{{NoiSinh}}': '', '{{DienThoaiCoQuan}}': '', '{{NgayCapCCCD}}': '', '{{NoiCapCCCD}}': '',
-    // Bên A — lấy theo Giấy ủy quyền hiện hành (xem DAI_DIEN_BEN_A ở đầu file).
     '{{NguoiDaiDienBenA}}': DAI_DIEN_BEN_A.hoTen,
     '{{ChucVuDaiDienBenA}}': DAI_DIEN_BEN_A.chucVu,
     '{{SoGiayUyQuyen}}': DAI_DIEN_BEN_A.soGiayUyQuyen,
     '{{NgayGiayUyQuyen}}': DAI_DIEN_BEN_A.ngayGiayUyQuyen,
-    // Hợp đồng.
     '{{MaSoHopDong}}': hopDong.Ma_So_HopDong,
     '{{TenNamHoc}}': namHoc ? namHoc.Ten_NamHoc : '',
     '{{NgayLap_Ngay}}': ngayLap.getDate(),
