@@ -104,6 +104,7 @@ function api_xuatFileHopDong(payload) {
     '{{NgaySinh}}': formatNgayVN_(gv.Ngay_Sinh),
     '{{TrinhDo}}': gv.Hoc_Ham_Hoc_Vi,
     '{{ChuyenNganh}}': gv.Chuyen_Nganh,
+    '{{DonViCongTacChinh}}': gv.Don_Vi_Cong_Tac_Chinh,
     '{{DiaChi}}': gv.Dia_Chi,
     '{{SoDienThoai}}': gv.So_Dien_Thoai,
     '{{SoCCCD}}': gv.So_CCCD,
