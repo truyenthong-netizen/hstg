@@ -75,11 +75,12 @@ function xuatPdfTuTemplate_(templateId, placeholders, tenFileMoi) {
 }
 
 /**
- * Bước 5: xuất file hợp đồng theo đúng mẫu BM-HĐTG-45 (mail-merge tự động toàn bộ các
- * trường hệ thống đã có sẵn, gồm cả Chức vụ/chức danh, Điện thoại cơ quan, Ngày/Nơi cấp CCCD
- * — 4/2026: đã thêm vào hồ sơ giảng viên, xem GiangVien.gs/api_boSungThongTinGiangVien).
- * Chỉ còn "Nơi sinh" là chưa có trường tương ứng trong hệ thống nên vẫn để trống trong file
- * xuất ra, Phòng TCCB điền tay khi trình ký.
+ * Bước 5: xuất file hợp đồng theo đúng mẫu BM-HĐTG-45 — mail-merge TOÀN BỘ các trường Bên B
+ * mà mẫu có chỗ điền, lấy thẳng từ hồ sơ giảng viên (kể cả Chức vụ/chức danh, Điện thoại cơ
+ * quan, Ngày/Nơi cấp CCCD, Nơi sinh — 4/2026: đã thêm đủ vào hồ sơ giảng viên, xem
+ * GiangVien.gs/api_boSungThongTinGiangVien). Không còn trường Bên B nào phải để trống nữa —
+ * nếu hồ sơ giảng viên chưa nhập trường nào thì trong file xuất ra trường đó sẽ trống, cần bổ
+ * sung hồ sơ trước khi xuất.
  */
 function api_xuatFileHopDong(payload) {
   yeuCauAdmin_(payload.token);
@@ -114,8 +115,7 @@ function api_xuatFileHopDong(payload) {
     '{{DienThoaiCoQuan}}': gv.Dien_Thoai_Co_Quan,
     '{{NgayCapCCCD}}': formatNgayVN_(gv.Ngay_Cap_CCCD),
     '{{NoiCapCCCD}}': gv.Noi_Cap_CCCD,
-    // Nơi sinh: vẫn chưa có trường tương ứng trong hồ sơ giảng viên — để trống, điền tay khi trình ký.
-    '{{NoiSinh}}': '',
+    '{{NoiSinh}}': gv.Noi_Sinh,
     // Bên A — lấy theo Giấy ủy quyền hiện hành (xem DAI_DIEN_BEN_A ở đầu file).
     '{{NguoiDaiDienBenA}}': DAI_DIEN_BEN_A.hoTen,
     '{{ChucVuDaiDienBenA}}': DAI_DIEN_BEN_A.chucVu,

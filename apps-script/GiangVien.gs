@@ -49,11 +49,12 @@ function api_taoGiangVien(payload) {
       Nguoi_Tao: session.tenDangNhap,
       Ngay_Tao: todayStr_(),
       // Dùng khi xuất hợp đồng (xem ExportUtils.gs) — không bắt buộc lúc tạo mới, có thể bổ
-      // sung sau bằng api_suaGiangVien.
+      // sung sau bằng api_boSungThongTinGiangVien.
       Chuc_Vu_Chuc_Danh: d.Chuc_Vu_Chuc_Danh || '',
       Dien_Thoai_Co_Quan: d.Dien_Thoai_Co_Quan || '',
       Ngay_Cap_CCCD: d.Ngay_Cap_CCCD || '',
       Noi_Cap_CCCD: d.Noi_Cap_CCCD || '',
+      Noi_Sinh: d.Noi_Sinh || '',
     };
     appendRow_(SHEETS.GIANG_VIEN, record);
     ghiNhatKy_('GIANG_VIEN', record.ID_GiangVien, 'Tao_Moi', null, record, session.tenDangNhap);
@@ -80,12 +81,12 @@ function api_suaGiangVien(payload) {
 }
 
 /**
- * Bổ sung/sửa 4 trường "phục vụ xuất hợp đồng" (Chức vụ/chức danh, Điện thoại cơ quan/đơn vị,
- * Ngày cấp CCCD, Nơi cấp CCCD) — dùng để điền vào mẫu BM-HĐTG-45 khi Admin xuất file (xem
- * ExportUtils.gs). Đây KHÔNG phải trường định danh gốc (CCCD/họ tên/ngày sinh) nên cho phép
- * bất kỳ ai đã đăng nhập (kể cả Đơn vị) tự bổ sung ngay lúc tra cứu/lập danh sách — không cần
- * quyền Admin như api_suaGiangVien (hàm đó sửa được cả CCCD/họ tên nên giữ nguyên chỉ Admin).
- * payload: { idGiangVien, Chuc_Vu_Chuc_Danh, Dien_Thoai_Co_Quan, Ngay_Cap_CCCD, Noi_Cap_CCCD }
+ * Bổ sung/sửa 5 trường "phục vụ xuất hợp đồng" (Chức vụ/chức danh, Điện thoại cơ quan/đơn vị,
+ * Ngày cấp CCCD, Nơi cấp CCCD, Nơi sinh) — dùng để điền vào mẫu BM-HĐTG-45 khi Admin xuất file
+ * (xem ExportUtils.gs). Đây KHÔNG phải trường định danh gốc (CCCD/họ tên/ngày sinh) nên cho
+ * phép bất kỳ ai đã đăng nhập (kể cả Đơn vị) tự bổ sung ngay lúc tra cứu/lập danh sách — không
+ * cần quyền Admin như api_suaGiangVien (hàm đó sửa được cả CCCD/họ tên nên giữ nguyên chỉ Admin).
+ * payload: { idGiangVien, Chuc_Vu_Chuc_Danh, Dien_Thoai_Co_Quan, Ngay_Cap_CCCD, Noi_Cap_CCCD, Noi_Sinh }
  */
 function api_boSungThongTinGiangVien(payload) {
   var session = yeuCauDangNhap_(payload.token);
@@ -93,7 +94,7 @@ function api_boSungThongTinGiangVien(payload) {
   var target = all.filter(function (gv) { return gv.ID_GiangVien === payload.idGiangVien; })[0];
   if (!target) return errorResponse_('Không tìm thấy giảng viên', 'NOT_FOUND');
 
-  var CHO_PHEP = ['Chuc_Vu_Chuc_Danh', 'Dien_Thoai_Co_Quan', 'Ngay_Cap_CCCD', 'Noi_Cap_CCCD'];
+  var CHO_PHEP = ['Chuc_Vu_Chuc_Danh', 'Dien_Thoai_Co_Quan', 'Ngay_Cap_CCCD', 'Noi_Cap_CCCD', 'Noi_Sinh'];
   var patch = {};
   CHO_PHEP.forEach(function (k) {
     if (payload[k] !== undefined) patch[k] = payload[k];

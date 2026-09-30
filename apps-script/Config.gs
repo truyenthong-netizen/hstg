@@ -43,18 +43,20 @@ var SCHEMA = {
 
   NAM_HOC: ['ID_NamHoc', 'Ten_NamHoc', 'Ngay_BatDau', 'Ngay_KetThuc'],
 
-  // 4 cột cuối (Chuc_Vu_Chuc_Danh, Dien_Thoai_Co_Quan, Ngay_Cap_CCCD, Noi_Cap_CCCD) thêm vào
-  // 4/2026 để in đủ mẫu hợp đồng BM-HĐTG-45 (trước đó để trống, điền tay khi trình ký) —
-  // cố tình thêm vào CUỐI mảng để không xáo trộn vị trí cột hiện có (xem ghi chú appendRow_/
-  // updateRow_ trong Utils.gs: 2 hàm này ghi THEO THỨ TỰ mảng này, không theo tên cột) — nhớ
-  // thêm đúng 4 cột này vào CUỐI hàng tiêu đề của sheet GIANG_VIEN thật (sau Ngay_Tao).
+  // 5 cột cuối (Chuc_Vu_Chuc_Danh, Dien_Thoai_Co_Quan, Ngay_Cap_CCCD, Noi_Cap_CCCD, Noi_Sinh)
+  // thêm vào 4/2026 để in đủ mẫu hợp đồng BM-HĐTG-45 (trước đó để trống, điền tay khi trình
+  // ký) — cố tình thêm vào CUỐI mảng để không xáo trộn vị trí cột hiện có (xem ghi chú
+  // appendRow_/updateRow_ trong Utils.gs: 2 hàm này ghi THEO THỨ TỰ mảng này, không theo tên
+  // cột) — nhớ thêm đúng 5 cột này vào CUỐI hàng tiêu đề của sheet GIANG_VIEN thật (sau
+  // Ngay_Tao). Noi_Sinh thêm SAU 3 cột kia (là cột thứ 5, sau Noi_Cap_CCCD) vì phát hiện
+  // thiếu sau khi đã thêm 4 cột đầu — nếu sheet đã có sẵn 4 cột S-V thì Noi_Sinh là cột W.
   GIANG_VIEN: [
     'ID_GiangVien', 'So_CCCD', 'Ho_Ten', 'Ngay_Sinh', 'Gioi_Tinh',
     'Hoc_Ham_Hoc_Vi', 'Chuyen_Nganh', 'Don_Vi_Cong_Tac_Chinh',
     'Dia_Chi', 'So_Dien_Thoai', 'Email',
     'So_Tai_Khoan', 'Ngan_Hang', 'Chi_Nhanh', 'Ma_So_Thue',
     'Trang_Thai_Ho_So', 'Nguoi_Tao', 'Ngay_Tao',
-    'Chuc_Vu_Chuc_Danh', 'Dien_Thoai_Co_Quan', 'Ngay_Cap_CCCD', 'Noi_Cap_CCCD',
+    'Chuc_Vu_Chuc_Danh', 'Dien_Thoai_Co_Quan', 'Ngay_Cap_CCCD', 'Noi_Cap_CCCD', 'Noi_Sinh',
   ],
 
   PHAN_CONG_THINH_GIANG: [
