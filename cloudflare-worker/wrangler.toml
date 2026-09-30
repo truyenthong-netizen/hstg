@@ -1,8 +1,13 @@
-name = "qlgv-thinhgiang-proxy"
+# Tên PHẢI khớp đúng tên Worker thật trên Cloudflare (Workers & Pages) — frontend
+# (frontend/assets/js/api.js -> API_BASE_URL) đang gọi cố định tới "hstg-proxy.tccb.workers.dev",
+# nên tên ở đây phải là "hstg-proxy". Nếu lệch tên, Cloudflare Workers Builds vẫn tự override
+# đúng theo Worker đã kết nối (xem cảnh báo trong build log) nhưng sẽ tiếp tục cảnh báo và có
+# thể tự mở PR để sửa — đổi cho khớp luôn ở đây để khỏi lặp lại cảnh báo mỗi lần build.
+name = "hstg-proxy"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 
-# Điền URL Web App Apps Script sau khi deploy (Bước 3 trong docs/DEPLOY.md).
-# Có thể đặt qua lệnh: wrangler secret put APPS_SCRIPT_URL
+# URL Web App Apps Script hiện tại — LUÔN đổi giá trị này (không đổi tên biến) mỗi khi
+# deploy Apps Script sang deployment mới. Có thể đặt qua lệnh: wrangler secret put APPS_SCRIPT_URL
 [vars]
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw3YbVLWJXrMY1tYYUiwEL4k4LB8Cw8K0lfVna0YbScgeL84Y-k6IMhTHoKHBKw3err4A/exec"
