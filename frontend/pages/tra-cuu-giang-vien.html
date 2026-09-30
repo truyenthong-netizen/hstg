@@ -46,6 +46,7 @@
 
       <h3 style="margin-top:16px;">Bổ sung thông tin phục vụ xuất hợp đồng (nếu hồ sơ chưa có — không bắt buộc để lập danh sách, nhưng cần có trước khi Admin xuất file Word/PDF)</h3>
       <label>Chức vụ/chức danh</label><input id="btChucVu" placeholder="VD: Trưởng khoa, Giảng viên..." />
+      <label>Nơi sinh</label><input id="btNoiSinh" placeholder="VD: TP. Hồ Chí Minh" />
       <label>Điện thoại cơ quan/đơn vị</label><input id="btDienThoaiCoQuan" />
       <label>Ngày cấp CCCD</label><input id="btNgayCapCCCD" type="date" />
       <label>Nơi cấp CCCD</label><input id="btNoiCapCCCD" placeholder="VD: Cục Cảnh sát QLHC về TTXH" />
@@ -74,6 +75,7 @@
       <label>Chi nhánh</label><input id="tmChiNhanh" />
       <label>Mã số thuế</label><input id="tmMaSoThue" />
       <label>Chức vụ/chức danh</label><input id="tmChucVu" placeholder="VD: Trưởng khoa, Giảng viên..." />
+      <label>Nơi sinh</label><input id="tmNoiSinh" placeholder="VD: TP. Hồ Chí Minh" />
       <label>Điện thoại cơ quan/đơn vị</label><input id="tmDienThoaiCoQuan" />
       <label>Ngày cấp CCCD</label><input id="tmNgayCapCCCD" type="date" />
       <label>Nơi cấp CCCD</label><input id="tmNoiCapCCCD" placeholder="VD: Cục Cảnh sát QLHC về TTXH" />
@@ -129,6 +131,7 @@
             document.getElementById('ktHocHam').textContent = gv.Hoc_Ham_Hoc_Vi;
             document.getElementById('ktCccd').textContent = gv.So_CCCD;
             document.getElementById('btChucVu').value = gv.Chuc_Vu_Chuc_Danh || '';
+            document.getElementById('btNoiSinh').value = gv.Noi_Sinh || '';
             document.getElementById('btDienThoaiCoQuan').value = gv.Dien_Thoai_Co_Quan || '';
             document.getElementById('btNgayCapCCCD').value = gv.Ngay_Cap_CCCD || '';
             document.getElementById('btNoiCapCCCD').value = gv.Noi_Cap_CCCD || '';
@@ -164,6 +167,7 @@
         Chi_Nhanh: document.getElementById('tmChiNhanh').value,
         Ma_So_Thue: document.getElementById('tmMaSoThue').value,
         Chuc_Vu_Chuc_Danh: document.getElementById('tmChucVu').value,
+        Noi_Sinh: document.getElementById('tmNoiSinh').value,
         Dien_Thoai_Co_Quan: document.getElementById('tmDienThoaiCoQuan').value,
         Ngay_Cap_CCCD: document.getElementById('tmNgayCapCCCD').value,
         Noi_Cap_CCCD: document.getElementById('tmNoiCapCCCD').value,
@@ -191,6 +195,7 @@
           await callApi('boSungThongTinGiangVien', {
             idGiangVien: giangVienHienTai.ID_GiangVien,
             Chuc_Vu_Chuc_Danh: document.getElementById('btChucVu').value,
+            Noi_Sinh: document.getElementById('btNoiSinh').value,
             Dien_Thoai_Co_Quan: document.getElementById('btDienThoaiCoQuan').value,
             Ngay_Cap_CCCD: document.getElementById('btNgayCapCCCD').value,
             Noi_Cap_CCCD: document.getElementById('btNoiCapCCCD').value,
