@@ -43,25 +43,38 @@ function sinhMaSoQuyetDinh_(idNamHoc, tenNamHoc) {
  */
 function api_taoHopDong(payload) {
   var session = yeuCauAdmin_(payload.token);
-  var d = payload.hopDong || {};
+  var ketQua = _taoMotHopDong_(session, payload.hopDong || {});
+  if (!ketQua.ok) return errorResponse_(ketQua.loi, ketQua.ma);
+  return okResponse_({ hopDong: ketQua.hopDong, quyetDinh: ketQua.quyetDinh });
+}
+
+/**
+ * Lõi xử lý lập 1 hợp đồng — tách riêng khỏi api_taoHopDong (giữ NGUYÊN logic/thứ tự kiểm
+ * tra cũ, không đổi hành vi) để api_taoHopDongHangLoat bên dưới gọi lại được cho nhiều giảng
+ * viên liên tiếp, thay vì Admin phải tra cứu + lập tay từng người một (không khả thi khi có
+ * hàng trăm/nghìn giảng viên nộp cùng lúc — xem api_danhSachGiangVienChoLapHopDong).
+ * Trả về { ok:true, hopDong, quyetDinh } hoặc { ok:false, loi, ma }.
+ */
+function _taoMotHopDong_(session, d) {
   var dsIdPhanCong = d.danhSachIdPhanCong || (d.ID_PhanCong ? [d.ID_PhanCong] : []);
-  if (!d.ID_NamHoc) return errorResponse_('Thiếu trường: ID_NamHoc', 'INVALID_INPUT');
-  if (!d.ID_GiangVien) return errorResponse_('Thiếu trường: ID_GiangVien', 'INVALID_INPUT');
-  if (!dsIdPhanCong.length) return errorResponse_('Chưa chọn dòng danh sách nào để lập hợp đồng', 'INVALID_INPUT');
+  if (!d.ID_NamHoc) return { ok: false, loi: 'Thiếu trường: ID_NamHoc', ma: 'INVALID_INPUT' };
+  if (!d.ID_GiangVien) return { ok: false, loi: 'Thiếu trường: ID_GiangVien', ma: 'INVALID_INPUT' };
+  if (!dsIdPhanCong.length) return { ok: false, loi: 'Chưa chọn dòng danh sách nào để lập hợp đồng', ma: 'INVALID_INPUT' };
 
   var giangVien = sheetToObjects_(SHEETS.GIANG_VIEN).filter(function (gv) { return gv.ID_GiangVien === d.ID_GiangVien; })[0];
-  if (!giangVien) return errorResponse_('Không tìm thấy giảng viên', 'NOT_FOUND');
+  if (!giangVien) return { ok: false, loi: 'Không tìm thấy giảng viên', ma: 'NOT_FOUND' };
   var namHoc = sheetToObjects_(SHEETS.NAM_HOC).filter(function (nh) { return nh.ID_NamHoc === d.ID_NamHoc; })[0];
-  if (!namHoc) return errorResponse_('Không tìm thấy năm học', 'NOT_FOUND');
+  if (!namHoc) return { ok: false, loi: 'Không tìm thấy năm học', ma: 'NOT_FOUND' };
 
   var daCoHopDong = sheetToObjects_(SHEETS.HOP_DONG).filter(function (hd) {
     return hd.ID_GiangVien === d.ID_GiangVien && hd.ID_NamHoc === d.ID_NamHoc && hd.Trang_Thai !== 'Huy';
   })[0];
   if (daCoHopDong) {
-    return errorResponse_(
-      'Giảng viên này đã có hợp đồng ' + daCoHopDong.Ma_So_HopDong + ' cho năm học này — mỗi giảng viên chỉ 1 hợp đồng/năm học. Nếu có đơn vị mời giảng thêm, dùng Lập phụ lục trên hợp đồng đó.',
-      'DA_CO_HOP_DONG'
-    );
+    return {
+      ok: false,
+      loi: 'Giảng viên ' + giangVien.Ho_Ten + ' đã có hợp đồng ' + daCoHopDong.Ma_So_HopDong + ' cho năm học này — mỗi giảng viên chỉ 1 hợp đồng/năm học. Nếu có đơn vị mời giảng thêm, dùng Lập phụ lục trên hợp đồng đó.',
+      ma: 'DA_CO_HOP_DONG',
+    };
   }
 
   var tatCaPhanCong = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG);
@@ -69,13 +82,13 @@ function api_taoHopDong(payload) {
     return tatCaPhanCong.filter(function (pc) { return pc.ID_PhanCong === id; })[0];
   });
   if (dsPhanCongChon.some(function (pc) { return !pc; })) {
-    return errorResponse_('Có dòng danh sách không tồn tại', 'NOT_FOUND');
+    return { ok: false, loi: 'Có dòng danh sách không tồn tại', ma: 'NOT_FOUND' };
   }
   var coDongKhongKhop = dsPhanCongChon.some(function (pc) {
     return pc.ID_GiangVien !== d.ID_GiangVien || pc.ID_NamHoc !== d.ID_NamHoc;
   });
   if (coDongKhongKhop) {
-    return errorResponse_('Có dòng danh sách không khớp giảng viên/năm học đã chọn', 'MISMATCH');
+    return { ok: false, loi: 'Có dòng danh sách không khớp giảng viên/năm học đã chọn', ma: 'MISMATCH' };
   }
 
   // Cộng dồn giờ dự kiến theo từng mục (Đại học / Sau đại học / NCKH) từ TẤT CẢ dòng đã chọn,
@@ -87,12 +100,25 @@ function api_taoHopDong(payload) {
     });
   });
   if (!Object.keys(gomTheoCapBac).length) {
-    return errorResponse_('Chưa có đơn vị nào nộp giờ giảng dự kiến cho giảng viên này trong năm học đã chọn — vào trang Danh sách đơn vị, dùng nút "Nhập giờ" trước khi lập hợp đồng', 'MISSING_GIO_DU_KIEN');
+    return {
+      ok: false,
+      loi: 'Chưa có đơn vị nào nộp giờ giảng dự kiến cho giảng viên ' + giangVien.Ho_Ten + ' trong năm học đã chọn — vào trang Danh sách đơn vị, dùng nút "Nhập giờ" trước khi lập hợp đồng',
+      ma: 'MISSING_GIO_DU_KIEN',
+    };
   }
 
   var dsIdDonVi = uniq_(dsPhanCongChon.map(function (pc) { return pc.ID_DonVi; }));
 
   return withLock_(function () {
+    // Kiểm tra lại lần cuối TRONG khoá — tránh 2 request lập hợp đồng cho cùng 1 giảng viên
+    // chạy song song (đặc biệt khi lập hàng loạt) đều lọt qua kiểm tra "đã có hợp đồng" ở trên.
+    var daCoLai = sheetToObjects_(SHEETS.HOP_DONG).filter(function (hd) {
+      return hd.ID_GiangVien === d.ID_GiangVien && hd.ID_NamHoc === d.ID_NamHoc && hd.Trang_Thai !== 'Huy';
+    })[0];
+    if (daCoLai) {
+      return { ok: false, loi: 'Giảng viên ' + giangVien.Ho_Ten + ' đã có hợp đồng ' + daCoLai.Ma_So_HopDong + ' (vừa được tạo)', ma: 'DA_CO_HOP_DONG' };
+    }
+
     var idHopDong = newId_('HD');
     var maSoHopDong = sinhMaSoHopDong_(d.ID_NamHoc, namHoc.Ten_NamHoc);
     var idQuyetDinh = newId_('QD');
@@ -139,8 +165,69 @@ function api_taoHopDong(payload) {
     ghiNhatKy_('HOP_DONG', idHopDong, 'Tao_Moi', null, hopDong, session.tenDangNhap);
     ghiNhatKy_('QUYET_DINH_HOP_DONG', idQuyetDinh, 'Tao_Moi', null, quyetDinh, session.tenDangNhap);
 
-    return okResponse_({ hopDong: hopDong, quyetDinh: quyetDinh });
+    return { ok: true, hopDong: hopDong, quyetDinh: quyetDinh };
   });
+}
+
+/**
+ * Lập hợp đồng HÀNG LOẠT — trả lời câu hỏi "cả nghìn giảng viên thì Admin tra tay từng người
+ * sao nổi": Admin chọn năm học + tick chọn nhiều giảng viên (lấy từ danh sách
+ * api_danhSachGiangVienChoLapHopDong trả về — đã lọc sẵn CHỈ những giảng viên có ít nhất 1
+ * đơn vị nộp giờ VÀ chưa có hợp đồng), hệ thống tự lấy TẤT CẢ phân công (mọi đơn vị) của từng
+ * giảng viên trong năm học đó rồi lập hợp đồng lần lượt — không phải tra CCCD từng người.
+ * "Nội dung giảng dạy" tự động ghép từ Môn_Hoc_HocPhan của các phân công gộp vào (đúng dữ liệu
+ * đơn vị đã nộp, Admin không phải gõ tay — xem veDsGiangVienHangLoat trong hop-dong.html).
+ * payload: { ID_NamHoc, danhSachGiangVien: [ID_GiangVien,...], Tu_Ngay, Den_Ngay }
+ * (Tu_Ngay/Den_Ngay áp dụng chung cho cả đợt lập — có thể để trống, bổ sung sau bằng Phụ lục
+ * hoặc sửa tay từng hợp đồng nếu cần khác nhau theo giảng viên.)
+ */
+function api_taoHopDongHangLoat(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var idNamHoc = payload.ID_NamHoc;
+  var dsIdGiangVien = payload.danhSachGiangVien || [];
+  if (!idNamHoc) return errorResponse_('Thiếu trường: ID_NamHoc', 'INVALID_INPUT');
+  if (!dsIdGiangVien.length) return errorResponse_('Chưa chọn giảng viên nào để lập hợp đồng', 'INVALID_INPUT');
+
+  var tatCaPhanCong = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (pc) {
+    return pc.ID_NamHoc === idNamHoc;
+  });
+
+  var thanhCong = [];
+  var loi = [];
+
+  dsIdGiangVien.forEach(function (idGiangVien) {
+    var phanCongCuaGV = tatCaPhanCong.filter(function (pc) {
+      return pc.ID_GiangVien === idGiangVien;
+    });
+    // Chỉ gộp dòng đã có giờ dự kiến (giống hệt điều kiện _taoMotHopDong_ đòi hỏi) — bỏ qua
+    // dòng đơn vị chưa nộp giờ, không chặn cả lượt lập hàng loạt vì 1 dòng thiếu giờ.
+    var phanCongCoGio = phanCongCuaGV.filter(function (pc) {
+      return layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong).some(function (ct) { return Number(ct.So_Gio || 0) > 0; });
+    });
+    if (!phanCongCoGio.length) {
+      loi.push({ idGiangVien: idGiangVien, loi: 'Chưa có đơn vị nào nộp giờ cho giảng viên này trong năm học đã chọn' });
+      return;
+    }
+
+    var noiDungGiangDay = uniq_(phanCongCoGio.map(function (pc) { return pc.Mon_Hoc_HocPhan; }).filter(Boolean)).join('; ');
+
+    var ketQua = _taoMotHopDong_(session, {
+      ID_NamHoc: idNamHoc,
+      ID_GiangVien: idGiangVien,
+      danhSachIdPhanCong: phanCongCoGio.map(function (pc) { return pc.ID_PhanCong; }),
+      Noi_Dung_Giang_Day: noiDungGiangDay,
+      Tu_Ngay: payload.Tu_Ngay || '',
+      Den_Ngay: payload.Den_Ngay || '',
+    });
+
+    if (ketQua.ok) {
+      thanhCong.push({ idGiangVien: idGiangVien, hopDong: ketQua.hopDong, quyetDinh: ketQua.quyetDinh });
+    } else {
+      loi.push({ idGiangVien: idGiangVien, loi: ketQua.loi, ma: ketQua.ma });
+    }
+  });
+
+  return okResponse_({ thanhCong: thanhCong, loi: loi });
 }
 
 /**

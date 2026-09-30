@@ -154,6 +154,69 @@ function api_timPhanCongTheoGiangVien(payload) {
   return okResponse_(result);
 }
 
+/**
+ * Admin: liệt kê TẤT CẢ giảng viên có ít nhất 1 dòng danh sách (bất kỳ đơn vị nào) trong năm
+ * học đã chọn VÀ CHƯA có hợp đồng (Trang_Thai != Huy) cho năm học đó — đây là danh sách
+ * "sẵn sàng lập hợp đồng" để dùng với api_taoHopDongHangLoat, thay vì Admin phải tra CCCD lập
+ * tay từng người một (không khả thi khi hàng trăm/nghìn giảng viên nộp cùng lúc).
+ * Mỗi dòng trả về kèm: tổng giờ dự kiến, danh sách tên đơn vị đã mời, danh sách môn học (dùng
+ * để tự động ghép "Nội dung giảng dạy" khi lập hàng loạt), và cờ coGio (false = đơn vị mời
+ * nhưng CHƯA nộp giờ, chưa thể lập — hiển thị để Admin biết, không tự bỏ qua âm thầm).
+ */
+function api_danhSachGiangVienChoLapHopDong(payload) {
+  yeuCauAdmin_(payload.token);
+  var idNamHoc = payload.idNamHoc;
+  if (!idNamHoc) return errorResponse_('Thiếu idNamHoc', 'INVALID_INPUT');
+
+  var phanCongNamHoc = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (pc) {
+    return pc.ID_NamHoc === idNamHoc;
+  });
+  var idGiangVienDaCoHopDong = {};
+  sheetToObjects_(SHEETS.HOP_DONG).forEach(function (hd) {
+    if (hd.ID_NamHoc === idNamHoc && hd.Trang_Thai !== 'Huy') idGiangVienDaCoHopDong[hd.ID_GiangVien] = true;
+  });
+
+  var gvMap = {};
+  sheetToObjects_(SHEETS.GIANG_VIEN).forEach(function (gv) { gvMap[gv.ID_GiangVien] = gv; });
+  var dvMap = {};
+  sheetToObjects_(SHEETS.DON_VI).forEach(function (dv) { dvMap[dv.ID_DonVi] = dv; });
+
+  var theoGiangVien = {};
+  phanCongNamHoc.forEach(function (pc) {
+    if (idGiangVienDaCoHopDong[pc.ID_GiangVien]) return; // đã có hợp đồng — không đưa vào danh sách chờ lập
+    if (!theoGiangVien[pc.ID_GiangVien]) theoGiangVien[pc.ID_GiangVien] = [];
+    theoGiangVien[pc.ID_GiangVien].push(pc);
+  });
+
+  var ketQua = Object.keys(theoGiangVien).map(function (idGiangVien) {
+    var gv = gvMap[idGiangVien] || {};
+    var dsPc = theoGiangVien[idGiangVien];
+    var m = { DaiHoc: 0, SauDaiHoc: 0, NCKH: 0 };
+    dsPc.forEach(function (pc) {
+      layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong).forEach(function (ct) {
+        m[ct.Cap_Bac] = (m[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+      });
+    });
+    var tong = m.DaiHoc + m.SauDaiHoc + m.NCKH;
+    return {
+      ID_GiangVien: idGiangVien,
+      Ho_Ten: gv.Ho_Ten,
+      So_CCCD: gv.So_CCCD,
+      Hoc_Ham_Hoc_Vi: gv.Hoc_Ham_Hoc_Vi,
+      Ten_DonVi: uniq_(dsPc.map(function (pc) { return (dvMap[pc.ID_DonVi] || {}).Ten_DonVi || pc.ID_DonVi; })).join(', '),
+      Mon_Hoc_HocPhan: uniq_(dsPc.map(function (pc) { return pc.Mon_Hoc_HocPhan; }).filter(Boolean)).join('; '),
+      TongGio: tong,
+      GioDaiHoc: m.DaiHoc,
+      GioSauDaiHoc: m.SauDaiHoc,
+      GioNCKH: m.NCKH,
+      SoDonVi: uniq_(dsPc.map(function (pc) { return pc.ID_DonVi; })).length,
+      coGio: tong > 0,
+    };
+  });
+  ketQua.sort(function (a, b) { return (a.Ho_Ten || '').localeCompare(b.Ho_Ten || ''); });
+  return okResponse_(ketQua);
+}
+
 // TODO Bước 4 — Xuất trình ký PDF: xuất Word/PDF bằng Google Docs template (xem ExportUtils.gs)
 // — cần đơn vị cung cấp file mẫu biểu thống nhất để đối chiếu vị trí các trường placeholder.
 // (Xuất/nhập Excel giờ dự kiến đã có, xử lý ở phía trình duyệt bằng thư viện SheetJS — xem danh-sach-don-vi.html.)
