@@ -23,7 +23,30 @@
 
   <main>
     <div class="card">
-      <h2>Bước 5 — Lập hợp đồng mới (Admin)</h2>
+      <h2>Bước 5a — Lập hợp đồng hàng loạt (Admin)</h2>
+      <p style="font-size:13px; color:#555;">
+        Danh sách dưới đây liệt kê TẤT CẢ giảng viên đã được ít nhất 1 đơn vị lập danh sách trong năm học chọn
+        và <strong>chưa có hợp đồng</strong> — không cần tra CCCD từng người như Bước 5b bên dưới.
+        Mặc định chọn hết các dòng đã có giờ; "Nội dung giảng dạy" tự động ghép từ các môn học đơn vị đã nộp
+        cho từng giảng viên. Dòng "Chưa nộp giờ" (mờ, không tick được) là đơn vị đã mời nhưng chưa nhập giờ —
+        có thể bổ sung hợp đồng cho người đó ở lượt lập sau, hoặc lập trước rồi dùng Phụ lục khi đơn vị nộp bổ sung.
+      </p>
+      <label>Năm học *</label>
+      <select id="namHocHangLoat" onchange="taiDsGiangVienHangLoat()"></select>
+      <label>Từ ngày (áp dụng chung cho cả đợt, có thể để trống)</label><input id="tuNgayHangLoat" type="date" />
+      <label>Đến ngày (áp dụng chung cho cả đợt, có thể để trống)</label><input id="denNgayHangLoat" type="date" />
+      <div style="margin:10px 0;">
+        <button class="secondary" onclick="chonTatCaHangLoat(true)">Chọn tất cả</button>
+        <button class="secondary" onclick="chonTatCaHangLoat(false)">Bỏ chọn tất cả</button>
+      </div>
+      <div id="dsGiangVienHangLoat" style="overflow-x:auto;"></div>
+      <button id="nutTaoHopDongHangLoat" onclick="taoHopDongHangLoat(this)" disabled style="margin-top:10px;">Lập hợp đồng cho các giảng viên đã chọn</button>
+      <div id="loiHangLoat" class="error"></div>
+      <div id="ketQuaHangLoat" style="margin-top:8px; font-size:14px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Bước 5b — Lập hợp đồng từng người (tra cứu theo CCCD)</h2>
       <label>Tra cứu giảng viên theo CCCD *</label>
       <input id="cccd" />
       <button onclick="traCuuGiangVien(this)">Tra cứu</button>
@@ -104,10 +127,98 @@
 
     async function khoiTao() {
       const namHocs = await callApi('danhSachNamHoc', {});
-      document.getElementById('namHocChon').innerHTML = namHocs.map(n => `<option value="${n.ID_NamHoc}">${n.Ten_NamHoc}</option>`).join('');
+      const optionsHtml = namHocs.map(n => `<option value="${n.ID_NamHoc}">${n.Ten_NamHoc}</option>`).join('');
+      document.getElementById('namHocChon').innerHTML = optionsHtml;
+      document.getElementById('namHocHangLoat').innerHTML = optionsHtml;
       taiDanhSachHopDong();
+      taiDsGiangVienHangLoat();
     }
     khoiTao();
+
+    // ===== Bước 5a — Lập hợp đồng hàng loạt =====
+    let dsGiangVienChoLap = [];
+
+    async function taiDsGiangVienHangLoat() {
+      const idNamHoc = document.getElementById('namHocHangLoat').value;
+      document.getElementById('dsGiangVienHangLoat').innerHTML = '';
+      document.getElementById('ketQuaHangLoat').innerHTML = '';
+      document.getElementById('loiHangLoat').textContent = '';
+      document.getElementById('nutTaoHopDongHangLoat').disabled = true;
+      if (!idNamHoc) return;
+      try {
+        dsGiangVienChoLap = await callApi('danhSachGiangVienChoLapHopDong', { idNamHoc });
+        veDsGiangVienHangLoat();
+      } catch (err) {
+        document.getElementById('loiHangLoat').textContent = err.message;
+      }
+    }
+
+    function veDsGiangVienHangLoat() {
+      const el = document.getElementById('dsGiangVienHangLoat');
+      if (!dsGiangVienChoLap.length) {
+        el.innerHTML = '<p style="color:#555;">Không có giảng viên nào đang chờ lập hợp đồng cho năm học này (mọi giảng viên đã có hợp đồng, hoặc chưa đơn vị nào lập danh sách).</p>';
+        return;
+      }
+      el.innerHTML = `<table><thead><tr>
+          <th></th><th>Họ tên</th><th>CCCD</th><th>Đơn vị mời</th><th>Môn học/học phần</th><th>Tổng giờ</th>
+        </tr></thead><tbody>` +
+        dsGiangVienChoLap.map((gv, idx) => `
+          <tr style="${gv.coGio ? '' : 'opacity:0.55;'}">
+            <td><input type="checkbox" data-idx="${idx}" ${gv.coGio ? 'checked' : 'disabled'} onchange="capNhatNutHangLoat()" /></td>
+            <td>${gv.Ho_Ten || ''} ${gv.Hoc_Ham_Hoc_Vi ? '(' + gv.Hoc_Ham_Hoc_Vi + ')' : ''}</td>
+            <td>${gv.So_CCCD || ''}</td>
+            <td>${gv.Ten_DonVi || ''} (${gv.SoDonVi} đơn vị)</td>
+            <td>${gv.Mon_Hoc_HocPhan || ''}</td>
+            <td>${gv.coGio ? gv.TongGio + ' giờ' : '<span style="color:#b00020;">Chưa nộp giờ</span>'}</td>
+          </tr>`).join('') +
+        `</tbody></table>`;
+      capNhatNutHangLoat();
+    }
+
+    function chonTatCaHangLoat(chon) {
+      document.querySelectorAll('#dsGiangVienHangLoat input[type=checkbox]:not(:disabled)').forEach(cb => { cb.checked = chon; });
+      capNhatNutHangLoat();
+    }
+
+    function capNhatNutHangLoat() {
+      const checks = document.querySelectorAll('#dsGiangVienHangLoat input[type=checkbox]:checked');
+      document.getElementById('nutTaoHopDongHangLoat').disabled = !checks.length;
+    }
+
+    async function taoHopDongHangLoat(btn) {
+      const loiEl = document.getElementById('loiHangLoat');
+      const ketQuaEl = document.getElementById('ketQuaHangLoat');
+      loiEl.textContent = '';
+      ketQuaEl.innerHTML = '';
+      const checks = document.querySelectorAll('#dsGiangVienHangLoat input[type=checkbox]:checked');
+      if (!checks.length) { loiEl.textContent = 'Chưa chọn giảng viên nào'; return; }
+      const danhSachGiangVien = Array.from(checks).map(cb => dsGiangVienChoLap[Number(cb.dataset.idx)].ID_GiangVien);
+      if (!confirm(`Xác nhận lập hợp đồng cho ${danhSachGiangVien.length} giảng viên đã chọn?`)) return;
+
+      await chayVoiNutBan(btn, 'Đang lập hợp đồng hàng loạt...', async () => {
+        try {
+          const result = await callApi('taoHopDongHangLoat', {
+            ID_NamHoc: document.getElementById('namHocHangLoat').value,
+            danhSachGiangVien,
+            Tu_Ngay: document.getElementById('tuNgayHangLoat').value,
+            Den_Ngay: document.getElementById('denNgayHangLoat').value,
+          });
+          let html = `<strong style="color:#1a7a35;">Đã lập thành công ${result.thanhCong.length} hợp đồng.</strong>`;
+          if (result.loi && result.loi.length) {
+            html += `<br><strong style="color:#b00020;">${result.loi.length} giảng viên lập lỗi:</strong><ul>` +
+              result.loi.map(l => {
+                const gv = dsGiangVienChoLap.find(g => g.ID_GiangVien === l.idGiangVien);
+                return `<li>${gv ? gv.Ho_Ten : l.idGiangVien}: ${l.loi}</li>`;
+              }).join('') + '</ul>';
+          }
+          ketQuaEl.innerHTML = html;
+          taiDsGiangVienHangLoat();
+          taiDanhSachHopDong();
+        } catch (err) {
+          loiEl.textContent = err.message;
+        }
+      });
+    }
 
     async function traCuuGiangVien(btn) {
       const cccd = document.getElementById('cccd').value.trim();
