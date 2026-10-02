@@ -53,6 +53,26 @@
     </div>
 
     <div class="card">
+      <h2>Danh mục Học hàm/Học vị</h2>
+      <p style="font-size:13px; color:#555;">
+        Danh sách này dùng cho ô "Học hàm/học vị" ở mọi trang (tạo hồ sơ giảng viên, định mức chi thỉnh giảng...) —
+        sửa/thêm ở đây là áp dụng cho toàn hệ thống, không cần sửa từng trang. Lưu ý: thêm 1 học hàm/học vị mới ở đây
+        <strong>không tự có định mức chi thỉnh giảng</strong> — nhớ xuống bảng "Định mức chi thỉnh giảng" bên dưới
+        thêm đơn giá cho đúng tên vừa thêm, nếu không giảng viên mang học hàm/học vị đó sẽ không thanh lý được hợp đồng.
+      </p>
+      <div id="thongDiepHocHamBang" style="margin-bottom:8px;"></div>
+      <table>
+        <thead><tr><th>Tên</th><th>Thứ tự hiển thị</th><th>Thao tác</th></tr></thead>
+        <tbody id="bangHocHam"></tbody>
+      </table>
+      <h3>Thêm học hàm/học vị mới</h3>
+      <label>Tên *</label><input id="hhTen" placeholder="VD: BS.CKI" />
+      <label>Thứ tự hiển thị (để trống sẽ tự xếp cuối)</label><input id="hhThuTu" type="number" />
+      <button onclick="taoHocHam(this)">Thêm</button>
+      <div id="thongDiepHocHam" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
       <h2>Định mức chi thỉnh giảng theo học hàm/học vị</h2>
       <p style="font-size:13px; color:#555;">Theo Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV). Định mức nào đã được dùng để thanh lý ít nhất 1 hợp đồng sẽ không cho đổi học hàm/đơn giá hoặc xoá nữa (chỉ sửa được ngày hiệu lực đến/căn cứ) — muốn đổi đơn giá, thêm dòng mới với ngày hiệu lực mới, để giữ đúng lịch sử tính thù lao các hợp đồng trước đó.</p>
       <div id="thongDiepDinhMucBang" style="margin-bottom:8px;"></div>
@@ -62,9 +82,7 @@
       </table>
       <h3>Thêm định mức mới</h3>
       <label>Học hàm/học vị *</label>
-      <select id="dmHocHam">
-        <option>GS.TS</option><option>PGS.TS</option><option>TS</option><option>ThS</option><option>Đại học</option>
-      </select>
+      <select id="dmHocHam"></select>
       <label>Đơn giá (đồng/tiết chuẩn) *</label><input id="dmDonGia" type="number" />
       <label>Hiệu lực từ</label><input id="dmTuNgay" type="date" />
       <label>Hiệu lực đến (để trống nếu chưa xác định)</label><input id="dmDenNgay" type="date" />
@@ -82,21 +100,26 @@
     let dsDonVi = [];
     let dsNamHoc = [];
     let dsDinhMuc = [];
+    let dsHocHam = [];
     let idDonViDangSua = null;
     let idNamHocDangSua = null;
     let idDinhMucDangSua = null;
+    let idHocHamDangSua = null;
 
     async function taiTatCa() {
-      const [donVis, namHocs, dinhMucs] = await Promise.all([
+      const [donVis, namHocs, dinhMucs, hocHams] = await Promise.all([
         callApi('danhSachDonVi', {}),
         callApi('danhSachNamHoc', {}),
         callApi('danhSachDinhMuc', {}),
+        callApi('danhMucHocHamHocVi', {}),
       ]);
       dsDonVi = donVis;
       dsNamHoc = namHocs;
       dsDinhMuc = dinhMucs;
+      dsHocHam = hocHams;
       veDonVi();
       veNamHoc();
+      veHocHam();
       veDinhMuc();
     }
 
@@ -213,7 +236,80 @@
       });
     }
 
-    const HOC_HAM_HOC_VI_TUY_CHON = ['GS.TS', 'PGS.TS', 'TS', 'ThS', 'Đại học'];
+    function veHocHam() {
+      document.getElementById('bangHocHam').innerHTML = dsHocHam.map(h => {
+        if (h.ID_HocHamHocVi === idHocHamDangSua) {
+          return `
+          <tr>
+            <td><input id="shh_ten_${h.ID_HocHamHocVi}" value="${escAttr(h.Ten)}" /></td>
+            <td><input id="shh_thutu_${h.ID_HocHamHocVi}" type="number" value="${Number(h.Thu_Tu_Hien_Thi || 0)}" style="width:80px;" /></td>
+            <td>
+              <button onclick="suaHocHamLuu(this, '${h.ID_HocHamHocVi}')">Lưu</button>
+              <button class="secondary" onclick="suaHocHamHuy()">Huỷ</button>
+            </td>
+          </tr>`;
+        }
+        return `
+        <tr>
+          <td>${h.Ten}</td><td>${h.Thu_Tu_Hien_Thi}</td>
+          <td>
+            <button class="secondary" onclick="suaHocHamBatDau('${h.ID_HocHamHocVi}')">Sửa</button>
+            <button class="secondary" onclick="xoaHocHam(this, '${h.ID_HocHamHocVi}', '${escAttr(h.Ten)}')">Xoá</button>
+          </td>
+        </tr>`;
+      }).join('');
+      document.getElementById('dmHocHam').innerHTML = dsHocHam.map(h => `<option value="${escAttr(h.Ten)}">${h.Ten}</option>`).join('');
+    }
+
+    function suaHocHamBatDau(id) { idHocHamDangSua = id; veHocHam(); }
+    function suaHocHamHuy() { idHocHamDangSua = null; veHocHam(); }
+
+    async function suaHocHamLuu(btn, id) {
+      const ten = document.getElementById('shh_ten_' + id).value.trim();
+      const thuTu = document.getElementById('shh_thutu_' + id).value;
+      await chayVoiNutBan(btn, 'Đang lưu...', async () => {
+        try {
+          const result = await callApi('suaHocHamHocVi', { idHocHamHocVi: id, patch: { Ten: ten, Thu_Tu_Hien_Thi: thuTu } });
+          idHocHamDangSua = null;
+          baoThongDiep('thongDiepHocHamBang', 'Đã cập nhật.' + (result.canhBao || ''), true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepHocHamBang', err.message, false);
+        }
+      });
+    }
+
+    async function xoaHocHam(btn, id, ten) {
+      if (!confirm('Xoá hẳn "' + ten + '" khỏi danh mục?')) return;
+      await chayVoiNutBan(btn, 'Đang xoá...', async () => {
+        try {
+          await callApi('xoaHocHamHocVi', { idHocHamHocVi: id });
+          baoThongDiep('thongDiepHocHamBang', 'Đã xoá.', true);
+          await taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepHocHamBang', err.message, false);
+        }
+      });
+    }
+
+    async function taoHocHam(btn) {
+      await chayVoiNutBan(btn, 'Đang thêm...', async () => {
+        try {
+          await callApi('taoHocHamHocVi', {
+            hocHamHocVi: {
+              Ten: document.getElementById('hhTen').value,
+              Thu_Tu_Hien_Thi: document.getElementById('hhThuTu').value,
+            },
+          });
+          baoThongDiep('thongDiepHocHam', 'Đã thêm.', true);
+          document.getElementById('hhTen').value = '';
+          document.getElementById('hhThuTu').value = '';
+          taiTatCa();
+        } catch (err) {
+          baoThongDiep('thongDiepHocHam', err.message, false);
+        }
+      });
+    }
 
     function veDinhMuc() {
       document.getElementById('bangDinhMuc').innerHTML = dsDinhMuc.map(d => {
@@ -222,7 +318,7 @@
           <tr>
             <td>
               <select id="sdm_hocham_${d.ID_DinhMuc}">
-                ${HOC_HAM_HOC_VI_TUY_CHON.map(h => `<option ${h === d.Hoc_Ham_Hoc_Vi ? 'selected' : ''}>${h}</option>`).join('')}
+                ${dsHocHam.map(h => `<option ${h.Ten === d.Hoc_Ham_Hoc_Vi ? 'selected' : ''}>${h.Ten}</option>`).join('')}
               </select>
             </td>
             <td><input id="sdm_dongia_${d.ID_DinhMuc}" type="number" value="${Number(d.Don_Gia_Gio_Chuan)}" style="width:110px;" /></td>

@@ -62,9 +62,7 @@
       <label>Giới tính</label>
       <select id="tmGioiTinh"><option>Nam</option><option>Nữ</option></select>
       <label>Học hàm/học vị</label>
-      <select id="tmHocHam">
-        <option>GS.TS</option><option>PGS.TS</option><option>TS</option><option>ThS</option><option>Đại học</option>
-      </select>
+      <select id="tmHocHam"></select>
       <label>Chuyên ngành</label><input id="tmChuyenNganh" />
       <label>Đơn vị công tác chính</label><input id="tmDonViCongTac" />
       <label>Địa chỉ</label><input id="tmDiaChi" />
@@ -113,6 +111,12 @@
       sel.innerHTML = list.map(nh => `<option value="${nh.ID_NamHoc}">${nh.Ten_NamHoc}</option>`).join('');
     }
     napNamHoc();
+
+    async function napHocHam() {
+      const list = await callApi('danhMucHocHamHocVi', {});
+      document.getElementById('tmHocHam').innerHTML = list.map(h => `<option value="${h.Ten}">${h.Ten}</option>`).join('');
+    }
+    napHocHam();
 
     async function traCuu(btn) {
       const cccd = document.getElementById('cccd').value.trim();
