@@ -26,6 +26,7 @@ var SHEETS = {
   HOP_DONG: 'HOP_DONG',
   QUYET_DINH_HOP_DONG: 'QUYET_DINH_HOP_DONG',
   DM_NOI_DUNG_GIANG_DAY: 'DM_NOI_DUNG_GIANG_DAY',
+  DM_HOC_HAM_HOC_VI: 'DM_HOC_HAM_HOC_VI',
   CHI_TIET_GIO_GIANG: 'CHI_TIET_GIO_GIANG',
   GIAY_XAC_NHAN_GIO_GIANG: 'GIAY_XAC_NHAN_GIO_GIANG',
   DINH_MUC_DON_GIA: 'DINH_MUC_DON_GIA',
@@ -85,6 +86,12 @@ var SCHEMA = {
 
   DM_NOI_DUNG_GIANG_DAY: ['ID_NoiDung', 'Ten_NoiDung', 'He_So_Quy_Doi_Mac_Dinh', 'Thu_Tu_Hien_Thi'],
 
+  // Thêm 10/2026: trước đây "Học hàm/học vị" là danh sách cứng gõ sẵn trong HTML (tra-cuu-giang-vien.html,
+  // danh-muc.html) — đơn vị báo danh mục này còn thay đổi tiếp (thêm BS.CKI/CKII, ĐD, DS...), nên tách
+  // thành danh mục do Admin tự quản lý ở đây, các trang khác gọi API danhMucHocHamHocVi để nạp danh sách
+  // thay vì gõ cứng — xem DanhMucHocHamHocVi.gs.
+  DM_HOC_HAM_HOC_VI: ['ID_HocHamHocVi', 'Ten', 'Thu_Tu_Hien_Thi'],
+
   CHI_TIET_GIO_GIANG: [
     'ID_ChiTiet', 'Nguon', 'ID_ThamChieu', 'ID_NoiDung',
     'Cap_Bac', 'So_Gio', 'So_Gio_Chuan',
@@ -133,6 +140,20 @@ var NOI_DUNG_GIANG_DAY_MAC_DINH = [
   { ten: 'Hướng dẫn (khóa luận, luận văn, luận án)', heSo: 1 },
   { ten: 'Công việc khác', heSo: 1 },
   { ten: 'Hội đồng đánh giá (Luận án, Luận văn, Đề án SĐH)', heSo: 1 },
+];
+
+// Danh mục Học hàm/Học vị mặc định (nạp sẵn khi chạy migrateThemDanhMucHocHamHocVi() lần đầu —
+// xem Sheets_Init.gs). Giữ thêm "Đại học" ở cuối vì đây là giá trị mặc định cũ (dropdown cứng
+// trước đây) — hồ sơ giảng viên đã lưu rồi có thể vẫn đang mang giá trị này.
+// LƯU Ý: thêm 1 Học hàm/học vị mới vào đây (hoặc qua giao diện Danh mục) KHÔNG tự có định mức
+// chi thỉnh giảng tương ứng — phải vào Danh mục → "Định mức chi thỉnh giảng" thêm đơn giá cho
+// đúng tên đó nữa, nếu không giảng viên mang học hàm/học vị mới sẽ không thanh lý được hợp đồng
+// (xem DinhMuc.gs/timDinhMucHieuLuc_ — không tìm thấy định mức sẽ báo lỗi ở bước thanh lý).
+var HOC_HAM_HOC_VI_MAC_DINH = [
+  'GS.TS', 'PGS.TS', 'TS', 'ThS',
+  'BS.CKII', 'BS.CKI', 'ĐD.CKI', 'ĐD.CKII', 'DS.CKI', 'DS.CKII',
+  'BS', 'ĐD', 'DS',
+  'Đại học',
 ];
 
 // Định mức chi thỉnh giảng mặc định — theo ảnh Quy chế chi tiêu nội bộ (Mục 11.4 tài liệu YCNV).

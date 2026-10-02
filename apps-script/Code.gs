@@ -34,6 +34,10 @@ var ACTION_MAP = {
   taoDinhMuc: api_taoDinhMuc,
   suaDinhMuc: api_suaDinhMuc,
   xoaDinhMuc: api_xoaDinhMuc,
+  danhMucHocHamHocVi: api_danhMucHocHamHocVi,
+  taoHocHamHocVi: api_taoHocHamHocVi,
+  suaHocHamHocVi: api_suaHocHamHocVi,
+  xoaHocHamHocVi: api_xoaHocHamHocVi,
 
   // Giảng viên
   traCuuGiangVienTheoCCCD: api_traCuuGiangVienTheoCCCD,

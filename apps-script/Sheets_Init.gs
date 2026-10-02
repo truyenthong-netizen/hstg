@@ -28,6 +28,44 @@ function initSheets() {
   Logger.log('Khởi tạo schema hoàn tất. Đã tạo %s sheet.', Object.keys(SHEETS).length);
 }
 
+/**
+ * Chạy 1 LẦN DUY NHẤT từ Apps Script editor (chọn hàm này -> bấm Run) trên hệ thống ĐANG CHẠY
+ * THẬT (đã có dữ liệu) để thêm sheet DM_HOC_HAM_HOC_VI mới (10/2026) — KHÔNG chạy lại initSheets()
+ * trên hệ thống đã có dữ liệu vì hàm đó lặp qua ghi header mọi sheet, rủi ro không cần thiết.
+ * An toàn chạy lại nhiều lần (bỏ qua nếu sheet đã có sẵn dữ liệu).
+ */
+function migrateThemDanhMucHocHamHocVi() {
+  var db = getDb_();
+  Logger.log('Đang chạy trên Google Sheet: ' + db.getUrl());
+  Logger.log('Tên sheet đích cần có (từ Config.gs): "' + SHEETS.DM_HOC_HAM_HOC_VI + '"');
+
+  var sh = db.getSheetByName(SHEETS.DM_HOC_HAM_HOC_VI);
+  if (!sh) {
+    sh = db.insertSheet(SHEETS.DM_HOC_HAM_HOC_VI);
+    var headers = SCHEMA.DM_HOC_HAM_HOC_VI;
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
+    Logger.log('-> Vừa TẠO MỚI sheet "' + SHEETS.DM_HOC_HAM_HOC_VI + '".');
+  } else {
+    Logger.log('-> Sheet "' + SHEETS.DM_HOC_HAM_HOC_VI + '" ĐÃ CÓ SẴN từ trước (không tạo lại).');
+  }
+  if (sh.getLastRow() < 2) {
+    HOC_HAM_HOC_VI_MAC_DINH.forEach(function (ten, i) {
+      appendRow_(SHEETS.DM_HOC_HAM_HOC_VI, {
+        ID_HocHamHocVi: newId_('HH'),
+        Ten: ten,
+        Thu_Tu_Hien_Thi: i + 1,
+      });
+    });
+    Logger.log('-> Đã nạp ' + HOC_HAM_HOC_VI_MAC_DINH.length + ' giá trị mặc định.');
+  } else {
+    Logger.log('-> Sheet đã có dữ liệu (dòng cuối: ' + sh.getLastRow() + ') — KHÔNG nạp lại.');
+  }
+
+  Logger.log('Danh sách TẤT CẢ sheet hiện có trong file này: ' + db.getSheets().map(function (s) { return s.getName(); }).join(', '));
+  Logger.log('Đã tạo/kiểm tra xong sheet DM_HOC_HAM_HOC_VI. Mở đúng link ở dòng đầu log này để xem tab mới.');
+}
+
 function napDanhMucMacDinh_() {
   var shNoiDung = getSheet_(SHEETS.DM_NOI_DUNG_GIANG_DAY);
   if (shNoiDung.getLastRow() < 2) {
@@ -36,6 +74,17 @@ function napDanhMucMacDinh_() {
         ID_NoiDung: newId_('ND'),
         Ten_NoiDung: nd.ten,
         He_So_Quy_Doi_Mac_Dinh: nd.heSo,
+        Thu_Tu_Hien_Thi: i + 1,
+      });
+    });
+  }
+
+  var shHocHam = getSheet_(SHEETS.DM_HOC_HAM_HOC_VI);
+  if (shHocHam.getLastRow() < 2) {
+    HOC_HAM_HOC_VI_MAC_DINH.forEach(function (ten, i) {
+      appendRow_(SHEETS.DM_HOC_HAM_HOC_VI, {
+        ID_HocHamHocVi: newId_('HH'),
+        Ten: ten,
         Thu_Tu_Hien_Thi: i + 1,
       });
     });
