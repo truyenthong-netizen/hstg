@@ -185,6 +185,12 @@
       document.getElementById('nutTaoHopDongHangLoat').disabled = !checks.length;
     }
 
+    // Gửi theo từng lô nhỏ thay vì dồn cả nghìn giảng viên vào 1 lần gọi API — 1 lần gọi quá
+    // lớn khiến Apps Script chạy lâu, Cloudflare Worker proxy chờ không nổi và trả lỗi
+    // "error code: 524" dù hệ thống vẫn đang xử lý phía sau (vẫn giữ lại để an toàn kép dù
+    // backend api_taoHopDongHangLoat đã được viết lại cho nhanh hơn nhiều — xem HopDong.gs).
+    const CO_LAP_HOP_DONG_HANG_LOAT = 80;
+
     async function taoHopDongHangLoat(btn) {
       const loiEl = document.getElementById('loiHangLoat');
       const ketQuaEl = document.getElementById('ketQuaHangLoat');
@@ -195,27 +201,49 @@
       const danhSachGiangVien = Array.from(checks).map(cb => dsGiangVienChoLap[Number(cb.dataset.idx)].ID_GiangVien);
       if (!confirm(`Xác nhận lập hợp đồng cho ${danhSachGiangVien.length} giảng viên đã chọn?`)) return;
 
+      const idNamHoc = document.getElementById('namHocHangLoat').value;
+      const tuNgay = document.getElementById('tuNgayHangLoat').value;
+      const denNgay = document.getElementById('denNgayHangLoat').value;
+
+      const lo = [];
+      for (let i = 0; i < danhSachGiangVien.length; i += CO_LAP_HOP_DONG_HANG_LOAT) {
+        lo.push(danhSachGiangVien.slice(i, i + CO_LAP_HOP_DONG_HANG_LOAT));
+      }
+
       await chayVoiNutBan(btn, 'Đang lập hợp đồng hàng loạt...', async () => {
+        const tongThanhCong = [];
+        const tongLoi = [];
         try {
-          const result = await callApi('taoHopDongHangLoat', {
-            ID_NamHoc: document.getElementById('namHocHangLoat').value,
-            danhSachGiangVien,
-            Tu_Ngay: document.getElementById('tuNgayHangLoat').value,
-            Den_Ngay: document.getElementById('denNgayHangLoat').value,
-          });
-          let html = `<strong style="color:#1a7a35;">Đã lập thành công ${result.thanhCong.length} hợp đồng.</strong>`;
-          if (result.loi && result.loi.length) {
-            html += `<br><strong style="color:#b00020;">${result.loi.length} giảng viên lập lỗi:</strong><ul>` +
-              result.loi.map(l => {
+          for (let i = 0; i < lo.length; i++) {
+            btn.textContent = `Đang lập hợp đồng... (lô ${i + 1}/${lo.length}, ${tongThanhCong.length}/${danhSachGiangVien.length} xong)`;
+            const result = await callApi('taoHopDongHangLoat', {
+              ID_NamHoc: idNamHoc,
+              danhSachGiangVien: lo[i],
+              Tu_Ngay: tuNgay,
+              Den_Ngay: denNgay,
+            });
+            tongThanhCong.push(...result.thanhCong);
+            if (result.loi) tongLoi.push(...result.loi);
+          }
+          let html = `<strong style="color:#1a7a35;">Đã lập thành công ${tongThanhCong.length} hợp đồng.</strong>`;
+          if (tongLoi.length) {
+            html += `<br><strong style="color:#b00020;">${tongLoi.length} giảng viên lập lỗi:</strong><ul>` +
+              tongLoi.map(l => {
                 const gv = dsGiangVienChoLap.find(g => g.ID_GiangVien === l.idGiangVien);
                 return `<li>${gv ? gv.Ho_Ten : l.idGiangVien}: ${l.loi}</li>`;
               }).join('') + '</ul>';
           }
           ketQuaEl.innerHTML = html;
+        } catch (err) {
+          let html = '';
+          if (tongThanhCong.length) {
+            html += `<strong style="color:#1a7a35;">Đã lập thành công ${tongThanhCong.length} hợp đồng trước khi gặp lỗi.</strong><br>`;
+          }
+          ketQuaEl.innerHTML = html;
+          loiEl.textContent = err.message + ' — các giảng viên chưa kịp lập vẫn còn trong danh sách chờ, bấm lại nút này để lập tiếp phần còn lại.';
+        } finally {
           taiDsGiangVienHangLoat();
           taiDanhSachHopDong();
-        } catch (err) {
-          loiEl.textContent = err.message;
         }
       });
     }
