@@ -181,6 +181,18 @@ function api_danhSachGiangVienChoLapHopDong(payload) {
   var dvMap = {};
   sheetToObjects_(SHEETS.DON_VI).forEach(function (dv) { dvMap[dv.ID_DonVi] = dv; });
 
+  // QUAN TRỌNG (hiệu năng, 10/2026): đọc CHI_TIET_GIO_GIANG đúng 1 LẦN ở đây rồi gom theo
+  // ID_ThamChieu, thay vì gọi layChiTietTheoThamChieu_ (đọc lại TOÀN BỘ sheet này) cho TỪNG
+  // dòng phân công trong vòng lặp bên dưới — với gần 1.000 dòng phân công, cách cũ đọc lại cả
+  // sheet ~1.000 lần khiến trang "Bước 5a" tải rất lâu. Cách này giảm xuống còn 4 lần đọc sheet
+  // tổng cộng cho cả hàm (PHAN_CONG_THINH_GIANG, HOP_DONG, GIANG_VIEN, DON_VI, CHI_TIET_GIO_GIANG),
+  // không phụ thuộc số dòng phân công nữa.
+  var chiTietTheoPhanCong = {};
+  sheetToObjects_(SHEETS.CHI_TIET_GIO_GIANG).forEach(function (ct) {
+    if (ct.Nguon !== 'PhanCong') return;
+    (chiTietTheoPhanCong[ct.ID_ThamChieu] = chiTietTheoPhanCong[ct.ID_ThamChieu] || []).push(ct);
+  });
+
   var theoGiangVien = {};
   phanCongNamHoc.forEach(function (pc) {
     if (idGiangVienDaCoHopDong[pc.ID_GiangVien]) return; // đã có hợp đồng — không đưa vào danh sách chờ lập
@@ -193,7 +205,7 @@ function api_danhSachGiangVienChoLapHopDong(payload) {
     var dsPc = theoGiangVien[idGiangVien];
     var m = { DaiHoc: 0, SauDaiHoc: 0, NCKH: 0 };
     dsPc.forEach(function (pc) {
-      layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong).forEach(function (ct) {
+      (chiTietTheoPhanCong[pc.ID_PhanCong] || []).forEach(function (ct) {
         m[ct.Cap_Bac] = (m[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
       });
     });
