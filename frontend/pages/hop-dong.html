@@ -138,17 +138,23 @@
     // ===== Bước 5a — Lập hợp đồng hàng loạt =====
     let dsGiangVienChoLap = [];
 
+    // Chọn năm học xong là load danh sách NGAY (không cần bấm gì thêm) để Admin nắm được
+    // số giảng viên/giờ dự kiến trước khi quyết định lập hàng loạt — hiện rõ trạng thái
+    // "đang tải" và báo lỗi ngay trong vùng danh sách (không chỉ ở dòng lỗi nhỏ phía dưới)
+    // để không bị hiểu nhầm là trống khi thật ra đang tải hoặc đang gặp lỗi.
     async function taiDsGiangVienHangLoat() {
       const idNamHoc = document.getElementById('namHocHangLoat').value;
-      document.getElementById('dsGiangVienHangLoat').innerHTML = '';
+      const dsEl = document.getElementById('dsGiangVienHangLoat');
       document.getElementById('ketQuaHangLoat').innerHTML = '';
       document.getElementById('loiHangLoat').textContent = '';
       document.getElementById('nutTaoHopDongHangLoat').disabled = true;
-      if (!idNamHoc) return;
+      if (!idNamHoc) { dsEl.innerHTML = ''; return; }
+      dsEl.innerHTML = '<p style="color:#555;">Đang tải danh sách giảng viên...</p>';
       try {
         dsGiangVienChoLap = await callApi('danhSachGiangVienChoLapHopDong', { idNamHoc });
         veDsGiangVienHangLoat();
       } catch (err) {
+        dsEl.innerHTML = `<p style="color:#b00020;">Không tải được danh sách: ${err.message}</p>`;
         document.getElementById('loiHangLoat').textContent = err.message;
       }
     }
