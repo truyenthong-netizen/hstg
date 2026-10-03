@@ -181,6 +181,20 @@ function _taoMotHopDong_(session, d) {
  * (Tu_Ngay/Den_Ngay áp dụng chung cho cả đợt lập — có thể để trống, bổ sung sau bằng Phụ lục
  * hoặc sửa tay từng hợp đồng nếu cần khác nhau theo giảng viên.)
  */
+/**
+ * CHÚ Ý HIỆU NĂNG (10/2026): hàm này KHÔNG gọi lại _taoMotHopDong_ theo từng giảng viên như
+ * bản cũ nữa. Lý do: _taoMotHopDong_ đọc lại TOÀN BỘ nhiều sheet (GIANG_VIEN, HOP_DONG,
+ * PHAN_CONG_THINH_GIANG, CHI_TIET_GIO_GIANG...) + tự sinh mã số bằng cách quét lại HOP_DONG/
+ * QUYET_DINH_HOP_DONG MỖI LẦN gọi, và ghi từng dòng bằng appendRow_ (1 lệnh Sheets API/dòng).
+ * Với vài trăm/nghìn giảng viên chọn cùng lúc ("lập hợp đồng hàng loạt"), việc này cộng dồn
+ * thành hàng phút chạy — vượt quá thời gian Cloudflare Worker proxy chờ phản hồi, trả về lỗi
+ * "error code: 524" ở trình duyệt dù Apps Script vẫn còn đang chạy tiếp ở phía sau.
+ * Hàm bên dưới đọc MỖI sheet liên quan đúng 1 LẦN, xử lý hoàn toàn trong bộ nhớ, rồi ghi tất
+ * cả dòng mới bằng appendRows_ (1 lệnh ghi/sheet) — nhanh hơn nhiều lần, nhưng PHẢI giữ ĐÚNG
+ * các điều kiện kiểm tra như _taoMotHopDong_ (đã có hợp đồng chưa, đã nộp giờ chưa...) để
+ * không đổi hành vi. _taoMotHopDong_/api_taoHopDong (Bước 5b lập từng người) giữ NGUYÊN,
+ * không đổi — chỉ đường lập hàng loạt này được viết lại.
+ */
 function api_taoHopDongHangLoat(payload) {
   var session = yeuCauAdmin_(payload.token);
   var idNamHoc = payload.ID_NamHoc;
@@ -188,44 +202,162 @@ function api_taoHopDongHangLoat(payload) {
   if (!idNamHoc) return errorResponse_('Thiếu trường: ID_NamHoc', 'INVALID_INPUT');
   if (!dsIdGiangVien.length) return errorResponse_('Chưa chọn giảng viên nào để lập hợp đồng', 'INVALID_INPUT');
 
+  var namHoc = sheetToObjects_(SHEETS.NAM_HOC).filter(function (nh) { return nh.ID_NamHoc === idNamHoc; })[0];
+  if (!namHoc) return errorResponse_('Không tìm thấy năm học', 'NOT_FOUND');
+
+  var giangVienMap = {};
+  sheetToObjects_(SHEETS.GIANG_VIEN).forEach(function (gv) { giangVienMap[gv.ID_GiangVien] = gv; });
+
   var tatCaPhanCong = sheetToObjects_(SHEETS.PHAN_CONG_THINH_GIANG).filter(function (pc) {
     return pc.ID_NamHoc === idNamHoc;
   });
+  var phanCongTheoGiangVien = {};
+  tatCaPhanCong.forEach(function (pc) {
+    (phanCongTheoGiangVien[pc.ID_GiangVien] = phanCongTheoGiangVien[pc.ID_GiangVien] || []).push(pc);
+  });
+
+  // Gom CHI_TIET_GIO_GIANG (nguồn PhanCong) theo ID_ThamChieu — đọc 1 lần thay vì mỗi dòng
+  // phân công lại quét lại cả sheet (layChiTietTheoThamChieu_ gọi riêng rất tốn khi lặp nhiều).
+  var chiTietTheoPhanCong = {};
+  sheetToObjects_(SHEETS.CHI_TIET_GIO_GIANG).forEach(function (ct) {
+    if (ct.Nguon !== 'PhanCong') return;
+    (chiTietTheoPhanCong[ct.ID_ThamChieu] = chiTietTheoPhanCong[ct.ID_ThamChieu] || []).push(ct);
+  });
+
+  var danhSachHopDong = sheetToObjects_(SHEETS.HOP_DONG);
+  var idGiangVienDaCoHopDong = {};
+  danhSachHopDong.forEach(function (hd) {
+    if (hd.Trang_Thai !== 'Huy') idGiangVienDaCoHopDong[hd.ID_NamHoc + '|' + hd.ID_GiangVien] = hd;
+  });
+  var demHopDongNamHocNay = danhSachHopDong.filter(function (hd) { return hd.ID_NamHoc === idNamHoc; }).length;
+  var demQuyetDinh = sheetToObjects_(SHEETS.QUYET_DINH_HOP_DONG).length;
 
   var thanhCong = [];
   var loi = [];
+  var moiHopDong = [];
+  var moiQuyetDinh = [];
+  var moiChiTiet = [];
+  var moiNhatKy = [];
+  var daChonTrongLuotNay = {}; // phòng trường hợp payload gửi trùng 1 giảng viên nhiều lần
 
   dsIdGiangVien.forEach(function (idGiangVien) {
-    var phanCongCuaGV = tatCaPhanCong.filter(function (pc) {
-      return pc.ID_GiangVien === idGiangVien;
-    });
-    // Chỉ gộp dòng đã có giờ dự kiến (giống hệt điều kiện _taoMotHopDong_ đòi hỏi) — bỏ qua
-    // dòng đơn vị chưa nộp giờ, không chặn cả lượt lập hàng loạt vì 1 dòng thiếu giờ.
-    var phanCongCoGio = phanCongCuaGV.filter(function (pc) {
-      return layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong).some(function (ct) { return Number(ct.So_Gio || 0) > 0; });
-    });
-    if (!phanCongCoGio.length) {
-      loi.push({ idGiangVien: idGiangVien, loi: 'Chưa có đơn vị nào nộp giờ cho giảng viên này trong năm học đã chọn' });
+    if (daChonTrongLuotNay[idGiangVien]) return;
+    daChonTrongLuotNay[idGiangVien] = true;
+
+    var giangVien = giangVienMap[idGiangVien];
+    if (!giangVien) {
+      loi.push({ idGiangVien: idGiangVien, loi: 'Không tìm thấy giảng viên', ma: 'NOT_FOUND' });
+      return;
+    }
+    if (idGiangVienDaCoHopDong[idNamHoc + '|' + idGiangVien]) {
+      var hdCu = idGiangVienDaCoHopDong[idNamHoc + '|' + idGiangVien];
+      loi.push({ idGiangVien: idGiangVien, loi: 'Giảng viên ' + giangVien.Ho_Ten + ' đã có hợp đồng ' + hdCu.Ma_So_HopDong + ' cho năm học này', ma: 'DA_CO_HOP_DONG' });
       return;
     }
 
-    var noiDungGiangDay = uniq_(phanCongCoGio.map(function (pc) { return pc.Mon_Hoc_HocPhan; }).filter(Boolean)).join('; ');
+    var phanCongCuaGV = phanCongTheoGiangVien[idGiangVien] || [];
+    var phanCongCoGio = phanCongCuaGV.filter(function (pc) {
+      return (chiTietTheoPhanCong[pc.ID_PhanCong] || []).some(function (ct) { return Number(ct.So_Gio || 0) > 0; });
+    });
+    if (!phanCongCoGio.length) {
+      loi.push({ idGiangVien: idGiangVien, loi: 'Chưa có đơn vị nào nộp giờ cho giảng viên này trong năm học đã chọn', ma: 'MISSING_GIO_DU_KIEN' });
+      return;
+    }
 
-    var ketQua = _taoMotHopDong_(session, {
-      ID_NamHoc: idNamHoc,
-      ID_GiangVien: idGiangVien,
-      danhSachIdPhanCong: phanCongCoGio.map(function (pc) { return pc.ID_PhanCong; }),
-      Noi_Dung_Giang_Day: noiDungGiangDay,
-      Tu_Ngay: payload.Tu_Ngay || '',
-      Den_Ngay: payload.Den_Ngay || '',
+    var gomTheoCapBac = {};
+    phanCongCoGio.forEach(function (pc) {
+      (chiTietTheoPhanCong[pc.ID_PhanCong] || []).forEach(function (ct) {
+        gomTheoCapBac[ct.Cap_Bac] = (gomTheoCapBac[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+      });
+    });
+    var noiDungGiangDay = uniq_(phanCongCoGio.map(function (pc) { return pc.Mon_Hoc_HocPhan; }).filter(Boolean)).join('; ');
+    var dsIdDonVi = uniq_(phanCongCoGio.map(function (pc) { return pc.ID_DonVi; }));
+
+    demHopDongNamHocNay += 1;
+    demQuyetDinh += 1;
+    var idHopDong = newId_('HD');
+    var maSoHopDong = ('000' + demHopDongNamHocNay).slice(-3) + '/' + namHoc.Ten_NamHoc + '/ĐHYD-HĐTG';
+    var idQuyetDinh = newId_('QD');
+    var maSoQuyetDinh = ('000' + demQuyetDinh).slice(-3) + '/' + namHoc.Ten_NamHoc + '/QĐ-ĐHYD';
+
+    var hopDong = {
+      ID_HopDong: idHopDong, Ma_So_HopDong: maSoHopDong, ID_NamHoc: idNamHoc,
+      ID_DonVi: dsIdDonVi.join(','), ID_GiangVien: idGiangVien, So_CCCD: giangVien.So_CCCD,
+      ID_PhanCong: phanCongCoGio.map(function (pc) { return pc.ID_PhanCong; }).join(','),
+      ID_QuyetDinh: idQuyetDinh, Noi_Dung_Giang_Day: noiDungGiangDay,
+      Tu_Ngay: payload.Tu_Ngay || '', Den_Ngay: payload.Den_Ngay || '',
+      Trang_Thai: 'Du_Thao', Ly_Do_Huy: '',
+      Nguoi_Tao: session.tenDangNhap, Ngay_Tao: todayStr_(), Ngay_Ky: '',
+    };
+    var quyetDinh = {
+      ID_QuyetDinh: idQuyetDinh, Ma_So_QuyetDinh: maSoQuyetDinh, ID_HopDong: idHopDong,
+      Trich_Yeu: 'Về việc hợp đồng thỉnh giảng đối với ' + giangVien.Ho_Ten,
+      Ngay_Ky: '', Nguoi_Ky: '', File_DinhKem_Url: '',
+    };
+    moiHopDong.push(hopDong);
+    moiQuyetDinh.push(quyetDinh);
+    Object.keys(gomTheoCapBac).forEach(function (capBac) {
+      moiChiTiet.push({
+        ID_ChiTiet: newId_('CT'), Nguon: 'HopDong', ID_ThamChieu: idHopDong,
+        ID_NoiDung: '', Cap_Bac: capBac, So_Gio: gomTheoCapBac[capBac], So_Gio_Chuan: gomTheoCapBac[capBac],
+      });
+    });
+    moiNhatKy.push({
+      ID_NhatKy: newId_('LOG'), Doi_Tuong: 'HOP_DONG', ID_DoiTuong: idHopDong, Hanh_Dong: 'Tao_Moi',
+      Noi_Dung_Truoc: '', Noi_Dung_Sau: JSON.stringify(hopDong), Nguoi_Thuc_Hien: session.tenDangNhap, Thoi_Gian: nowStr_(),
+    });
+    moiNhatKy.push({
+      ID_NhatKy: newId_('LOG'), Doi_Tuong: 'QUYET_DINH_HOP_DONG', ID_DoiTuong: idQuyetDinh, Hanh_Dong: 'Tao_Moi',
+      Noi_Dung_Truoc: '', Noi_Dung_Sau: JSON.stringify(quyetDinh), Nguoi_Thuc_Hien: session.tenDangNhap, Thoi_Gian: nowStr_(),
     });
 
-    if (ketQua.ok) {
-      thanhCong.push({ idGiangVien: idGiangVien, hopDong: ketQua.hopDong, quyetDinh: ketQua.quyetDinh });
-    } else {
-      loi.push({ idGiangVien: idGiangVien, loi: ketQua.loi, ma: ketQua.ma });
-    }
+    // Đánh dấu ngay trong bộ nhớ để nếu (trường hợp dữ liệu lỗi) payload có 2 dòng cùng
+    // 1 giảng viên vẫn không tạo trùng 2 hợp đồng trong cùng 1 lượt chạy.
+    idGiangVienDaCoHopDong[idNamHoc + '|' + idGiangVien] = hopDong;
+    thanhCong.push({ idGiangVien: idGiangVien, hopDong: hopDong, quyetDinh: quyetDinh });
   });
+
+  if (moiHopDong.length) {
+    withLock_(function () {
+      // Kiểm tra lại lần cuối TRONG khoá — phòng trường hợp 1 phiên Admin khác vừa lập hợp
+      // đồng cho cùng giảng viên/năm học này trong lúc hàm này đang xử lý ở trên (trước khi
+      // giữ được khoá). Chỉ đọc lại HOP_DONG đúng 1 lần (không lặp theo từng dòng) nên vẫn nhanh.
+      var hopDongMoiNhat = {};
+      sheetToObjects_(SHEETS.HOP_DONG).forEach(function (hd) {
+        if (hd.Trang_Thai !== 'Huy') hopDongMoiNhat[hd.ID_NamHoc + '|' + hd.ID_GiangVien] = hd;
+      });
+      var ghiHopDong = [];
+      var idHopDongGhiDuoc = {};
+      var idQuyetDinhGhiDuoc = {};
+      moiHopDong.forEach(function (hd) {
+        var key = hd.ID_NamHoc + '|' + hd.ID_GiangVien;
+        var vaChay = hopDongMoiNhat[key] && hopDongMoiNhat[key].ID_HopDong !== hd.ID_HopDong;
+        if (vaChay) {
+          // Đổi kết quả tương ứng trong thanhCong -> loi.
+          var tc = thanhCong.filter(function (t) { return t.hopDong.ID_HopDong === hd.ID_HopDong; })[0];
+          if (tc) {
+            thanhCong.splice(thanhCong.indexOf(tc), 1);
+            loi.push({ idGiangVien: hd.ID_GiangVien, loi: 'Giảng viên vừa được lập hợp đồng ' + hopDongMoiNhat[key].Ma_So_HopDong + ' ở phiên khác trong lúc xử lý', ma: 'DA_CO_HOP_DONG' });
+          }
+          return;
+        }
+        ghiHopDong.push(hd);
+        idHopDongGhiDuoc[hd.ID_HopDong] = true;
+        idQuyetDinhGhiDuoc[hd.ID_QuyetDinh] = true;
+      });
+      var ghiQuyetDinh = moiQuyetDinh.filter(function (qd) { return idQuyetDinhGhiDuoc[qd.ID_QuyetDinh]; });
+      var ghiChiTiet = moiChiTiet.filter(function (ct) { return idHopDongGhiDuoc[ct.ID_ThamChieu]; });
+      var ghiNhatKyBatch = moiNhatKy.filter(function (lg) {
+        return (lg.Doi_Tuong === 'HOP_DONG' && idHopDongGhiDuoc[lg.ID_DoiTuong]) ||
+          (lg.Doi_Tuong === 'QUYET_DINH_HOP_DONG' && idQuyetDinhGhiDuoc[lg.ID_DoiTuong]);
+      });
+
+      appendRows_(SHEETS.HOP_DONG, ghiHopDong);
+      appendRows_(SHEETS.QUYET_DINH_HOP_DONG, ghiQuyetDinh);
+      appendRows_(SHEETS.CHI_TIET_GIO_GIANG, ghiChiTiet);
+      appendRows_(SHEETS.NHAT_KY_THAO_TAC, ghiNhatKyBatch);
+    });
+  }
 
   return okResponse_({ thanhCong: thanhCong, loi: loi });
 }

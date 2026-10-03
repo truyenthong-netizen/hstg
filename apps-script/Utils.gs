@@ -49,6 +49,24 @@ function appendRow_(sheetName, obj) {
   return obj;
 }
 
+/**
+ * Ghi thêm NHIỀU dòng cùng lúc bằng 1 lệnh setValues() duy nhất (nhanh hơn rất nhiều so với
+ * gọi appendRow_ lặp lại từng dòng — mỗi appendRow_ là 1 lệnh riêng, với vài trăm/nghìn dòng
+ * (ví dụ lập hợp đồng hàng loạt) sẽ cộng dồn thành hàng phút, vượt timeout phía Cloudflare
+ * Worker (lỗi "error code: 524") dù Apps Script vẫn đang chạy tiếp ở phía sau).
+ * objs: mảng object cùng cấu trúc như appendRow_ nhận. Không làm gì nếu objs rỗng.
+ */
+function appendRows_(sheetName, objs) {
+  if (!objs || !objs.length) return;
+  var sh = getSheet_(sheetName);
+  var cols = SCHEMA[sheetName];
+  var rows = objs.map(function (obj) {
+    return cols.map(function (c) { return ep_ChuoiSo_(c, obj[c] !== undefined ? obj[c] : ''); });
+  });
+  var hangBatDau = sh.getLastRow() + 1;
+  sh.getRange(hangBatDau, 1, rows.length, cols.length).setValues(rows);
+}
+
 /** Cập nhật 1 dòng đã biết __row, chỉ ghi đè các field có trong patch. */
 function updateRow_(sheetName, rowIndex, patch) {
   var sh = getSheet_(sheetName);
