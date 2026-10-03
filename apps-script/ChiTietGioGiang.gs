@@ -32,7 +32,7 @@ function layChiTietTheoThamChieu_(nguon, idThamChieu) {
 /** Tổng số giờ chuẩn của 1 nguồn (hợp đồng hoặc GCN), gộp tất cả loại nội dung + cấp bậc. */
 function tongGioChuan_(nguon, idThamChieu) {
   return layChiTietTheoThamChieu_(nguon, idThamChieu)
-    .reduce(function (sum, ct) { return sum + Number(ct.So_Gio_Chuan || 0); }, 0);
+    .reduce(function (sum, ct) { return sum + soGioAnToan_(ct.So_Gio_Chuan); }, 0);
 }
 
 function api_danhMucNoiDungGiangDay(payload) {

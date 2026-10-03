@@ -92,7 +92,7 @@ function api_xuatFileHopDong(payload) {
 
   var gioHopDong = {};
   layChiTietTheoThamChieu_('HopDong', hopDong.ID_HopDong).forEach(function (ct) {
-    gioHopDong[ct.Cap_Bac] = (gioHopDong[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+    gioHopDong[ct.Cap_Bac] = (gioHopDong[ct.Cap_Bac] || 0) + soGioAnToan_(ct.So_Gio);
   });
   var gDaiHoc = gioHopDong.DaiHoc || 0, gSauDaiHoc = gioHopDong.SauDaiHoc || 0, gNCKH = gioHopDong.NCKH || 0;
   var ngayLap = new Date();

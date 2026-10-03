@@ -8,6 +8,24 @@ function getSheet_(name) {
   return sh;
 }
 
+/**
+ * Ép 1 giá trị đọc từ cột "So_Gio"/"So_Gio_Chuan" (CHI_TIET_GIO_GIANG) về số giờ hợp lệ.
+ * Dùng thay cho Number(v || 0) ở MỌI nơi cộng dồn giờ — lý do (phát hiện 10/2026): nếu ô đó
+ * trên Google Sheet lỡ bị định dạng/dán nhầm thành kiểu Ngày tháng (Date), Apps Script đọc
+ * ra một đối tượng Date thay vì số, và Number(dateObj) trong JS âm thầm trả về mốc thời gian
+ * tính bằng mili-giây (một số rất lớn, ví dụ 1771866000000) — cộng dồn vào sẽ ra "giờ" vô lý
+ * như "1771866000000 giờ" mà không có lỗi nào báo ra. Hàm này chặn kiểu Date, chặn NaN, và
+ * chặn luôn số âm hoặc lớn bất thường (> 5000 giờ/dòng là chắc chắn sai, không giảng viên nào
+ * dạy nổi số giờ đó) — coi các trường hợp này là 0 thay vì làm sai lệch tổng hiển thị cho Admin.
+ */
+function soGioAnToan_(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (Object.prototype.toString.call(v) === '[object Date]') return 0;
+  var n = Number(v);
+  if (!isFinite(n) || isNaN(n) || n < 0 || n > 5000) return 0;
+  return n;
+}
+
 /** Đọc toàn bộ sheet thành mảng object, key = tên cột ở dòng header. */
 function sheetToObjects_(sheetName) {
   var sh = getSheet_(sheetName);

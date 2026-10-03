@@ -206,7 +206,7 @@ function api_danhSachGiangVienChoLapHopDong(payload) {
     var m = { DaiHoc: 0, SauDaiHoc: 0, NCKH: 0 };
     dsPc.forEach(function (pc) {
       (chiTietTheoPhanCong[pc.ID_PhanCong] || []).forEach(function (ct) {
-        m[ct.Cap_Bac] = (m[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+        m[ct.Cap_Bac] = (m[ct.Cap_Bac] || 0) + soGioAnToan_(ct.So_Gio);
       });
     });
     var tong = m.DaiHoc + m.SauDaiHoc + m.NCKH;

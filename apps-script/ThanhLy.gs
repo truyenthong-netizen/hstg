@@ -19,7 +19,7 @@ function sinhMaSoBienBan_() {
 function gomTheoCapBac_(chiTietList) {
   var map = {};
   chiTietList.forEach(function (ct) {
-    map[ct.Cap_Bac] = (map[ct.Cap_Bac] || 0) + Number(ct.So_Gio_Chuan || 0);
+    map[ct.Cap_Bac] = (map[ct.Cap_Bac] || 0) + soGioAnToan_(ct.So_Gio_Chuan);
   });
   return map;
 }

@@ -96,7 +96,7 @@ function _taoMotHopDong_(session, d) {
   var gomTheoCapBac = {};
   dsPhanCongChon.forEach(function (pc) {
     layChiTietTheoThamChieu_('PhanCong', pc.ID_PhanCong).forEach(function (ct) {
-      gomTheoCapBac[ct.Cap_Bac] = (gomTheoCapBac[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+      gomTheoCapBac[ct.Cap_Bac] = (gomTheoCapBac[ct.Cap_Bac] || 0) + soGioAnToan_(ct.So_Gio);
     });
   });
   if (!Object.keys(gomTheoCapBac).length) {
@@ -257,7 +257,7 @@ function api_taoHopDongHangLoat(payload) {
 
     var phanCongCuaGV = phanCongTheoGiangVien[idGiangVien] || [];
     var phanCongCoGio = phanCongCuaGV.filter(function (pc) {
-      return (chiTietTheoPhanCong[pc.ID_PhanCong] || []).some(function (ct) { return Number(ct.So_Gio || 0) > 0; });
+      return (chiTietTheoPhanCong[pc.ID_PhanCong] || []).some(function (ct) { return soGioAnToan_(ct.So_Gio) > 0; });
     });
     if (!phanCongCoGio.length) {
       loi.push({ idGiangVien: idGiangVien, loi: 'Chưa có đơn vị nào nộp giờ cho giảng viên này trong năm học đã chọn', ma: 'MISSING_GIO_DU_KIEN' });
@@ -267,7 +267,7 @@ function api_taoHopDongHangLoat(payload) {
     var gomTheoCapBac = {};
     phanCongCoGio.forEach(function (pc) {
       (chiTietTheoPhanCong[pc.ID_PhanCong] || []).forEach(function (ct) {
-        gomTheoCapBac[ct.Cap_Bac] = (gomTheoCapBac[ct.Cap_Bac] || 0) + Number(ct.So_Gio || 0);
+        gomTheoCapBac[ct.Cap_Bac] = (gomTheoCapBac[ct.Cap_Bac] || 0) + soGioAnToan_(ct.So_Gio);
       });
     });
     var noiDungGiangDay = uniq_(phanCongCoGio.map(function (pc) { return pc.Mon_Hoc_HocPhan; }).filter(Boolean)).join('; ');
