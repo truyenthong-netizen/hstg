@@ -395,6 +395,88 @@ function api_chuyenTrangThaiHopDong(payload) {
   return okResponse_({});
 }
 
+/**
+ * Bước 6 hàng loạt: chuyển nhiều hợp đồng Dự thảo -> Đã ký (hoặc -> Huỷ) CÙNG LÚC,
+ * thay vì phải bấm "Chuyển Đã ký" từng hợp đồng một (ví dụ ký cùng lúc ~725 hợp đồng
+ * vừa lập ở Bước 5b). Đọc HOP_DONG 1 lần, sửa trong bộ nhớ, ghi lại bằng 1 lệnh
+ * setValues() duy nhất — không dùng updateRow_ lặp lại từng dòng (sẽ lại gặp lỗi
+ * 524 timeout như hồi lập hợp đồng hàng loạt).
+ * payload.dsIdHopDong: mảng ID_HopDong cần chuyển. payload.trangThaiMoi: 'Da_Ky' | 'Huy'.
+ * payload.lyDoHuy: bắt buộc nếu trangThaiMoi là 'Huy'.
+ */
+function api_chuyenTrangThaiHopDongHangLoat(payload) {
+  var session = yeuCauAdmin_(payload.token);
+  var dsId = uniq_(payload.dsIdHopDong || []);
+  if (!dsId.length) return errorResponse_('Chưa chọn hợp đồng nào', 'MISSING_DATA');
+
+  var trangThaiMoi = payload.trangThaiMoi;
+  var hopLe = {
+    Du_Thao: ['Da_Ky', 'Huy'],
+    Da_Ky: ['Huy'],
+  };
+  if (trangThaiMoi !== 'Da_Ky' && trangThaiMoi !== 'Huy') {
+    return errorResponse_('Trạng thái mới không hợp lệ', 'INVALID_TRANSITION');
+  }
+  if (trangThaiMoi === 'Huy' && !payload.lyDoHuy) {
+    return errorResponse_('Phải nhập lý do huỷ', 'MISSING_LY_DO_HUY');
+  }
+
+  return withLock_(function () {
+    var sh = getSheet_(SHEETS.HOP_DONG);
+    var cols = SCHEMA[SHEETS.HOP_DONG];
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return okResponse_({ thanhCong: [], loi: [] });
+
+    var numCols = cols.length;
+    var range = sh.getRange(2, 1, lastRow - 1, numCols);
+    var data = range.getValues();
+
+    var idxId = cols.indexOf('ID_HopDong');
+    var idxTrangThai = cols.indexOf('Trang_Thai');
+    var idxNgayKy = cols.indexOf('Ngay_Ky');
+    var idxLyDoHuy = cols.indexOf('Ly_Do_Huy');
+
+    var wanted = {};
+    dsId.forEach(function (id) { wanted[id] = true; });
+
+    var thanhCong = [];
+    var loi = [];
+    var ngay = todayStr_();
+    var coThayDoi = false;
+
+    for (var r = 0; r < data.length; r++) {
+      var id = data[r][idxId];
+      if (!wanted[id]) continue;
+      var trangThaiHienTai = data[r][idxTrangThai];
+      if (!hopLe[trangThaiHienTai] || hopLe[trangThaiHienTai].indexOf(trangThaiMoi) === -1) {
+        loi.push({ idHopDong: id, loi: 'Không thể chuyển từ ' + trangThaiHienTai + ' sang ' + trangThaiMoi });
+        continue;
+      }
+      data[r][idxTrangThai] = trangThaiMoi;
+      if (trangThaiMoi === 'Da_Ky') data[r][idxNgayKy] = ngay;
+      if (trangThaiMoi === 'Huy') data[r][idxLyDoHuy] = payload.lyDoHuy;
+      thanhCong.push(id);
+      coThayDoi = true;
+    }
+
+    // Báo lỗi cho các ID được chọn nhưng không tìm thấy trong HOP_DONG (đã bị xoá/ đổi id...).
+    var timThay = {};
+    thanhCong.concat(loi.map(function (l) { return l.idHopDong; })).forEach(function (id) { timThay[id] = true; });
+    dsId.forEach(function (id) {
+      if (!timThay[id]) loi.push({ idHopDong: id, loi: 'Không tìm thấy hợp đồng' });
+    });
+
+    if (coThayDoi) range.setValues(data);
+
+    if (thanhCong.length) {
+      ghiNhatKy_('HOP_DONG', thanhCong.join(','), 'Chuyen_Trang_Thai_Hang_Loat',
+        {}, { Trang_Thai: trangThaiMoi, soLuong: thanhCong.length }, session.tenDangNhap);
+    }
+
+    return okResponse_({ thanhCong: thanhCong, loi: loi });
+  });
+}
+
 /** Bước 8: đơn vị tra cứu hợp đồng đủ điều kiện thanh lý (Da_Ky, thuộc đúng đơn vị, chưa thanh lý). */
 function api_layHopDongChoThanhLy(payload) {
   var session = yeuCauDangNhap_(payload.token);

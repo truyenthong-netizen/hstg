@@ -71,7 +71,10 @@ function xuatPdfTuTemplate_(templateId, placeholders, tenFileMoi) {
 
   var pdf = DriveApp.getFileById(copy.getId()).getAs('application/pdf');
   var pdfFile = folder.createFile(pdf).setName(tenFileMoi + '.pdf');
-  return pdfFile.getUrl();
+  // Xoá bản copy Google Doc trung gian (chỉ cần giữ lại PDF), tránh rác đầy thư mục Drive
+  // khi xuất hàng loạt hàng trăm/nghìn hợp đồng.
+  DriveApp.getFileById(copy.getId()).setTrashed(true);
+  return { url: pdfFile.getUrl(), fileId: pdfFile.getId() };
 }
 
 /**
@@ -137,8 +140,94 @@ function api_xuatFileHopDong(payload) {
     '{{NoiDungGiangDay}}': hopDong.Noi_Dung_Giang_Day,
   };
 
-  var url = xuatPdfTuTemplate_(TEMPLATE_DOC_IDS.HOP_DONG, placeholders, 'HopDong_' + hopDong.Ma_So_HopDong.replace(/\//g, '-'));
-  return okResponse_({ url: url });
+  var ketQua = xuatPdfTuTemplate_(TEMPLATE_DOC_IDS.HOP_DONG, placeholders, 'HopDong_' + hopDong.Ma_So_HopDong.replace(/\//g, '-'));
+  return okResponse_({ url: ketQua.url });
+}
+
+/**
+ * Xuất PDF hợp đồng cho NHIỀU hợp đồng cùng lúc (ví dụ xuất cả loạt vừa ký xong), để
+ * dùng ở Bước 6-7 thay vì phải bấm "Xuất file" từng hợp đồng một.
+ * Mỗi hợp đồng cần copy file mẫu + mở Google Doc + xuất PDF — khá nặng (vài giây/hợp đồng),
+ * nên hàm này CHỈ xử lý 1 lô nhỏ mỗi lần gọi; phía frontend tự chia lô và gọi lặp lại
+ * (giống cơ chế lập hợp đồng hàng loạt) để không vượt timeout của Apps Script/Cloudflare.
+ * Trả về danh sách fileId các PDF vừa tạo — dùng cho api_gomZipHopDong để gộp thành 1 file zip.
+ */
+function api_xuatFileHopDongHangLoat(payload) {
+  yeuCauAdmin_(payload.token);
+  var dsId = uniq_(payload.dsIdHopDong || []);
+  if (!dsId.length) return errorResponse_('Chưa chọn hợp đồng nào', 'MISSING_DATA');
+
+  var hdTheoId = {};
+  sheetToObjects_(SHEETS.HOP_DONG).forEach(function (h) { hdTheoId[h.ID_HopDong] = h; });
+  var gvTheoId = {};
+  sheetToObjects_(SHEETS.GIANG_VIEN).forEach(function (g) { gvTheoId[g.ID_GiangVien] = g; });
+  var nhTheoId = {};
+  sheetToObjects_(SHEETS.NAM_HOC).forEach(function (n) { nhTheoId[n.ID_NamHoc] = n; });
+  var chiTietTheoHopDong = {};
+  sheetToObjects_(SHEETS.CHI_TIET_GIO_GIANG).forEach(function (ct) {
+    if (ct.Nguon !== 'HopDong') return;
+    (chiTietTheoHopDong[ct.ID_ThamChieu] = chiTietTheoHopDong[ct.ID_ThamChieu] || []).push(ct);
+  });
+
+  var thanhCong = [];
+  var loi = [];
+
+  dsId.forEach(function (id) {
+    try {
+      var hopDong = hdTheoId[id];
+      if (!hopDong) { loi.push({ idHopDong: id, loi: 'Không tìm thấy hợp đồng' }); return; }
+      var gv = gvTheoId[hopDong.ID_GiangVien];
+      if (!gv) { loi.push({ idHopDong: id, loi: 'Không tìm thấy hồ sơ giảng viên' }); return; }
+      var namHoc = nhTheoId[hopDong.ID_NamHoc];
+
+      var gioHopDong = {};
+      (chiTietTheoHopDong[hopDong.ID_HopDong] || []).forEach(function (ct) {
+        gioHopDong[ct.Cap_Bac] = (gioHopDong[ct.Cap_Bac] || 0) + soGioAnToan_(ct.So_Gio);
+      });
+      var gDaiHoc = gioHopDong.DaiHoc || 0, gSauDaiHoc = gioHopDong.SauDaiHoc || 0, gNCKH = gioHopDong.NCKH || 0;
+      var ngayLap = new Date();
+
+      var placeholders = {
+        '{{HocHamHocVi}}': gv.Hoc_Ham_Hoc_Vi, '{{HoTen}}': gv.Ho_Ten,
+        '{{NgaySinh}}': formatNgayVN_(gv.Ngay_Sinh), '{{TrinhDo}}': gv.Hoc_Ham_Hoc_Vi,
+        '{{ChuyenNganh}}': gv.Chuyen_Nganh, '{{DonViCongTacChinh}}': gv.Don_Vi_Cong_Tac_Chinh,
+        '{{DiaChi}}': gv.Dia_Chi, '{{SoDienThoai}}': gv.So_Dien_Thoai, '{{SoCCCD}}': gv.So_CCCD,
+        '{{SoTaiKhoan}}': gv.So_Tai_Khoan, '{{NganHang}}': gv.Ngan_Hang, '{{ChiNhanh}}': gv.Chi_Nhanh,
+        '{{MaSoThue}}': gv.Ma_So_Thue, '{{ChucVuChucDanh}}': gv.Chuc_Vu_Chuc_Danh,
+        '{{DienThoaiCoQuan}}': gv.Dien_Thoai_Co_Quan, '{{NgayCapCCCD}}': formatNgayVN_(gv.Ngay_Cap_CCCD),
+        '{{NoiCapCCCD}}': gv.Noi_Cap_CCCD, '{{NoiSinh}}': gv.Noi_Sinh,
+        '{{NguoiDaiDienBenA}}': DAI_DIEN_BEN_A.hoTen, '{{ChucVuDaiDienBenA}}': DAI_DIEN_BEN_A.chucVu,
+        '{{SoGiayUyQuyen}}': DAI_DIEN_BEN_A.soGiayUyQuyen, '{{NgayGiayUyQuyen}}': DAI_DIEN_BEN_A.ngayGiayUyQuyen,
+        '{{MaSoHopDong}}': hopDong.Ma_So_HopDong, '{{TenNamHoc}}': namHoc ? namHoc.Ten_NamHoc : '',
+        '{{NgayLap_Ngay}}': ngayLap.getDate(), '{{NgayLap_Thang}}': ngayLap.getMonth() + 1, '{{NgayLap_Nam}}': ngayLap.getFullYear(),
+        '{{TuNgay}}': formatNgayVN_(hopDong.Tu_Ngay), '{{DenNgay}}': formatNgayVN_(hopDong.Den_Ngay),
+        '{{TongSoGio}}': gDaiHoc + gSauDaiHoc + gNCKH, '{{SoGioDaiHoc}}': gDaiHoc,
+        '{{SoGioSauDaiHoc}}': gSauDaiHoc, '{{SoGioNCKH}}': gNCKH, '{{NoiDungGiangDay}}': hopDong.Noi_Dung_Giang_Day,
+      };
+
+      var ketQua = xuatPdfTuTemplate_(TEMPLATE_DOC_IDS.HOP_DONG, placeholders, 'HopDong_' + hopDong.Ma_So_HopDong.replace(/\//g, '-'));
+      thanhCong.push({ idHopDong: id, maSoHopDong: hopDong.Ma_So_HopDong, url: ketQua.url, fileId: ketQua.fileId });
+    } catch (e) {
+      loi.push({ idHopDong: id, loi: e.message });
+    }
+  });
+
+  return okResponse_({ thanhCong: thanhCong, loi: loi });
+}
+
+/**
+ * Gộp nhiều file PDF (đã xuất bằng api_xuatFileHopDongHangLoat) thành 1 file .zip duy nhất,
+ * để Admin tải 1 lần thay vì mở từng link PDF một. Gọi sau khi đã xuất xong hết các lô.
+ */
+function api_gomZipHopDong(payload) {
+  yeuCauAdmin_(payload.token);
+  var dsFileId = uniq_(payload.dsFileId || []);
+  if (!dsFileId.length) return errorResponse_('Không có file nào để gộp', 'MISSING_DATA');
+  var folder = DriveApp.getFolderById(EXPORT_FOLDER_ID);
+  var blobs = dsFileId.map(function (id) { return DriveApp.getFileById(id).getBlob(); });
+  var zipBlob = Utilities.zip(blobs, 'HopDong_HangLoat_' + todayStr_() + '.zip');
+  var zipFile = folder.createFile(zipBlob);
+  return okResponse_({ url: zipFile.getUrl() });
 }
 
 // TODO: viết tương tự api_xuatFileQuyetDinh, api_xuatFileGiayXacNhan, api_xuatBienBanThanhLy

@@ -58,10 +58,13 @@ var ACTION_MAP = {
   taoHopDong: api_taoHopDong,
   taoHopDongHangLoat: api_taoHopDongHangLoat,
   chuyenTrangThaiHopDong: api_chuyenTrangThaiHopDong,
+  chuyenTrangThaiHopDongHangLoat: api_chuyenTrangThaiHopDongHangLoat,
   layHopDongChoThanhLy: api_layHopDongChoThanhLy,
   layHopDongTheoId: api_layHopDongTheoId,
   danhSachHopDong: api_danhSachHopDong,
   xuatFileHopDong: api_xuatFileHopDong,
+  xuatFileHopDongHangLoat: api_xuatFileHopDongHangLoat,
+  gomZipHopDong: api_gomZipHopDong,
 
   // Chi tiết giờ giảng
   layChiTietGio: api_layChiTietGio,
