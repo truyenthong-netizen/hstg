@@ -87,12 +87,19 @@
         <option value="Da_Thanh_Ly">Đã thanh lý</option>
         <option value="Huy">Đã huỷ</option>
       </select>
+      <div style="margin:8px 0;">
+        <button class="secondary" onclick="chonTatCaDangHienThi(true)">Chọn tất cả (đang hiển thị)</button>
+        <button class="secondary" onclick="chonTatCaDangHienThi(false)">Bỏ chọn tất cả</button>
+        <button id="nutKyHangLoat" onclick="kyHangLoat(this)" disabled>Chuyển Đã ký hàng loạt (<span id="soLuongChonKy">0</span>)</button>
+        <button id="nutXuatZipHangLoat" class="secondary" onclick="xuatZipHangLoat(this)" disabled>Xuất file hàng loạt — tải 1 file .zip (<span id="soLuongChonXuat">0</span>)</button>
+      </div>
       <table>
         <thead>
-          <tr><th>Số hợp đồng</th><th>Giảng viên</th><th>Đơn vị</th><th>Trạng thái</th><th>Thao tác</th></tr>
+          <tr><th></th><th>Số hợp đồng</th><th>Giảng viên</th><th>Đơn vị</th><th>Trạng thái</th><th>Thao tác</th></tr>
         </thead>
         <tbody id="bangHopDong"></tbody>
       </table>
+      <div id="ketQuaKyHangLoat"></div>
       <div id="loiQuanLy" class="error"></div>
     </div>
 
@@ -411,6 +418,7 @@
           const nutXuatFile = `<button class="secondary" onclick="xuatFileHopDong(this, '${hd.ID_HopDong}')">Xuất file (Word/PDF)</button>`;
           return `
             <tr>
+              <td><input type="checkbox" class="chonHopDong" value="${hd.ID_HopDong}" onchange="capNhatNutHangLoat()" /></td>
               <td>${hd.Ma_So_HopDong}</td>
               <td>${hd.Ho_Ten_GiangVien || ''} (${hd.Hoc_Ham_Hoc_Vi || ''})</td>
               <td>${hd.Ten_DonVi || ''}</td>
@@ -418,8 +426,94 @@
               <td>${nutChuyenDaKy} ${nutHuy} ${nutPhuLuc} ${nutXuatFile}</td>
             </tr>`;
         }).join('');
+        capNhatNutHangLoat();
       } catch (err) {
         loiEl.textContent = err.message;
+      }
+    }
+
+    function chonTatCaDangHienThi(chon) {
+      document.querySelectorAll('#bangHopDong .chonHopDong').forEach(cb => { cb.checked = chon; });
+      capNhatNutHangLoat();
+    }
+
+    function capNhatNutHangLoat() {
+      const n = document.querySelectorAll('#bangHopDong .chonHopDong:checked').length;
+      document.getElementById('soLuongChonKy').textContent = n;
+      document.getElementById('nutKyHangLoat').disabled = n === 0;
+      document.getElementById('soLuongChonXuat').textContent = n;
+      document.getElementById('nutXuatZipHangLoat').disabled = n === 0;
+    }
+
+    const CO_LAP_KY_HANG_LOAT = 150; // mỗi lần gọi API xử lý tối đa từng này hợp đồng, tránh timeout 524 phía Cloudflare
+
+    async function kyHangLoat(btn) {
+      const ds = Array.from(document.querySelectorAll('#bangHopDong .chonHopDong:checked')).map(cb => cb.value);
+      if (!ds.length) return;
+      if (!confirm(`Xác nhận chuyển ${ds.length} hợp đồng sang trạng thái Đã ký/Có hiệu lực? (hợp đồng không ở trạng thái Dự thảo sẽ tự động bị bỏ qua)`)) return;
+
+      document.getElementById('loiQuanLy').textContent = '';
+      const ketQuaEl = document.getElementById('ketQuaKyHangLoat');
+      ketQuaEl.innerHTML = '';
+      const nutGoc = btn.textContent;
+      btn.disabled = true;
+
+      let tongThanhCong = 0;
+      const tongLoi = [];
+      try {
+        for (let i = 0; i < ds.length; i += CO_LAP_KY_HANG_LOAT) {
+          const phan = ds.slice(i, i + CO_LAP_KY_HANG_LOAT);
+          btn.textContent = `Đang ký ${Math.min(i + phan.length, ds.length)}/${ds.length}...`;
+          const kq = await callApi('chuyenTrangThaiHopDongHangLoat', { dsIdHopDong: phan, trangThaiMoi: 'Da_Ky' });
+          tongThanhCong += (kq.thanhCong || []).length;
+          tongLoi.push(...(kq.loi || []));
+        }
+        ketQuaEl.innerHTML = `<p style="color:#2e7d32;">Đã chuyển Đã ký thành công ${tongThanhCong}/${ds.length} hợp đồng.</p>` +
+          (tongLoi.length ? `<p style="color:#b00020;">${tongLoi.length} hợp đồng không chuyển được: ${tongLoi.map(l => l.idHopDong + ' (' + l.loi + ')').join(', ')}</p>` : '');
+      } catch (err) {
+        ketQuaEl.innerHTML = `<p style="color:#b00020;">Đã ký được ${tongThanhCong} hợp đồng trước khi gặp lỗi: ${err.message}. Có thể bấm lại để tiếp tục (các hợp đồng đã ký rồi sẽ không bị ký trùng).</p>`;
+      } finally {
+        btn.textContent = nutGoc;
+        await taiDanhSachHopDong();
+      }
+    }
+
+    const CO_LAP_XUAT_ZIP = 20; // mỗi hợp đồng cần copy file mẫu + mở Google Doc + xuất PDF (nặng hơn ký), nên lô nhỏ hơn lô ký
+
+    async function xuatZipHangLoat(btn) {
+      const ds = Array.from(document.querySelectorAll('#bangHopDong .chonHopDong:checked')).map(cb => cb.value);
+      if (!ds.length) return;
+      if (!confirm(`Xuất file PDF cho ${ds.length} hợp đồng và gộp thành 1 file .zip để tải? Việc này có thể mất vài phút nếu chọn nhiều.`)) return;
+
+      document.getElementById('loiQuanLy').textContent = '';
+      const ketQuaEl = document.getElementById('ketQuaKyHangLoat');
+      ketQuaEl.innerHTML = '';
+      const nutGoc = btn.textContent;
+      btn.disabled = true;
+
+      const dsFileId = [];
+      const tongLoi = [];
+      try {
+        for (let i = 0; i < ds.length; i += CO_LAP_XUAT_ZIP) {
+          const phan = ds.slice(i, i + CO_LAP_XUAT_ZIP);
+          btn.textContent = `Đang xuất file ${Math.min(i + phan.length, ds.length)}/${ds.length}...`;
+          const kq = await callApi('xuatFileHopDongHangLoat', { dsIdHopDong: phan });
+          (kq.thanhCong || []).forEach(r => dsFileId.push(r.fileId));
+          tongLoi.push(...(kq.loi || []));
+        }
+        if (!dsFileId.length) {
+          ketQuaEl.innerHTML = `<p style="color:#b00020;">Không xuất được file nào.</p>`;
+          return;
+        }
+        btn.textContent = `Đang gộp ${dsFileId.length} file thành 1 file zip...`;
+        const kqZip = await callApi('gomZipHopDong', { dsFileId });
+        window.open(kqZip.url, '_blank');
+        ketQuaEl.innerHTML = `<p style="color:#2e7d32;">Đã xuất và gộp thành công ${dsFileId.length}/${ds.length} hợp đồng vào 1 file .zip (đã mở ở tab mới).</p>` +
+          (tongLoi.length ? `<p style="color:#b00020;">${tongLoi.length} hợp đồng lỗi: ${tongLoi.map(l => l.idHopDong + ' (' + l.loi + ')').join(', ')}</p>` : '');
+      } catch (err) {
+        ketQuaEl.innerHTML = `<p style="color:#b00020;">Lỗi khi xuất file hàng loạt: ${err.message}. Đã xuất được ${dsFileId.length} file trước khi lỗi — có thể thử lại.</p>`;
+      } finally {
+        btn.textContent = nutGoc;
       }
     }
 
